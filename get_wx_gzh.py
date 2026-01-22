@@ -93,10 +93,16 @@ def process_single_url(url, args, today_str):
             return result
             
         title = article_data['title']
+        author = article_data.get('author', 'Unknown')
+        # 优先使用文章实际发布日期，如果没有则使用当前日期
+        publish_date = article_data.get('publish_date') or today_str
+        
         print(f"  -> 标题: {title}")
+        print(f"  -> 日期: {publish_date}")
         
         # 2. 准备目录
-        article_dir, assets_dir = prepare_article_dir(args.user, today_str, title, args.output)
+        # 注意：这里我们使用 publish_date 来生成文件夹，这样归档更准确
+        article_dir, assets_dir = prepare_article_dir(args.user, publish_date, title, args.output)
         
         # 3. 转换
         download_images = not args.no_images
@@ -131,7 +137,7 @@ def process_single_url(url, args, today_str):
 
 def main():
     args = parse_args()
-    print(f"--- 微信公众号文章下载器 v3.3 (断点续传) ---")
+    print(f"--- 微信公众号文章下载器 v3.4 (断点续传) ---")
     
     # 1. 加载历史记录
     history_file = "history.log"

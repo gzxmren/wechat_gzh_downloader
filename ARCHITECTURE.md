@@ -1,4 +1,4 @@
-# 技术架构说明书 (Technical Architecture) v3.3
+# 技术架构说明书 (Technical Architecture) v3.4
 
 本文档描述 **WeChat Fav Downloader** 的最新架构，重点介绍 v3.x 引入的容错与自动化机制。
 
@@ -10,10 +10,13 @@ graph TD
     A --> C(Converter)
     A --> D(FileManager)
     A --> E(HistoryManager)
+    A --> M(MetadataExtractor)
     
     subgraph Core Features
     B -- 网络请求 (含Random Delay) --> C
+    C -- 标准 HTML 优先解析 --> C
     C -- 资源本地化 (ImageHandler) --> D
+    M -- 提取发布日期/作者 --> A
     D -- 检查本地 assets 重复 --> D
     end
     
@@ -35,8 +38,13 @@ graph TD
 *   **延时重试**: 针对网络抖动，主循环结束后会收集 `failed_items` 列表进行第二轮尝试。
 *   **持久化日志**: 记录 `error.log`，包含时间戳、URL 及具体的失败阶段，便于后期人工补救。
 
-### 2.3 内容包结构 (Storage Package)
-每篇文章拥有独立容器，包含：
+### 2.3 渲染逻辑与内容提取 (Rendering & Extraction)
+*   **标准 HTML 优先**: v3.4 引入了自适应解析逻辑，优先尝试标准 HTML 正文提取，仅在失败时回退到特定脚本解析。这有效防止了“相册模式”文章的正文丢失。
+*   **元数据增强**: 自动从 HTML 源码提取 `publish_time` 和作者信息，用于文件名及索引管理。
+
+### 2.4 内容包结构 (Storage Package)
+每篇文章拥有独立容器，采用扁平化目录结构：
+*   目录命名: `output/{文章标题}_{发布日期}/`
 *   `[标题].md`: 核心文本，图片链接已指向 assets。
 *   `[标题].pdf`: 高保真排版文件。
 *   `assets/`: 归档所有引用的图片，文件名基于 MD5 哈希去重。
@@ -47,5 +55,5 @@ graph TD
 *   **PDF 性能**: 利用 `wkhtmltopdf` 渲染前对微信 HTML 进行样式补丁（强制可见性、代码块高亮），修复常见空白页问题。
 
 ## 4. 下一步开发方向
+*   **v4.0 PDF 排版增强**: 增加自动生成目录 (TOC)、页码、封面支持。
 *   **并发处理 (Optional)**: 如果链接数量巨大，可考虑引入 `threading`，但需配合更复杂的反爬策略。
-*   **元数据解析增强**: 提取文章原始发布日期，并将其用于文件夹命名。

@@ -8,21 +8,18 @@ def sanitize_filename(name):
 def prepare_article_dir(user_name, date_str, title, base_output_dir="output"):
     """
     为单篇文章准备独立的目录结构。
-    
-    Returns:
-        tuple: (article_dir, assets_dir)
-        - article_dir: 文章根目录
-        - assets_dir: 图片存放目录
+    结构: output/{Title}_{Date}/
     """
-    # 1. 批次目录 (用户名 + 日期)
-    batch_folder = f"{user_name}_{date_str}_Articles"
-    
-    # 2. 文章独立目录
+    # 清理标题，防止路径过长或包含非法字符
     safe_title = sanitize_filename(title)
-    if len(safe_title) > 50:
-        safe_title = safe_title[:50] + "..."
+    if len(safe_title) > 100: # 稍微放宽长度限制，但仍需截断
+        safe_title = safe_title[:100] + "..."
+        
+    # 构造扁平化文件夹名称: 标题_日期
+    folder_name = f"{safe_title}_{date_str}"
     
-    article_dir = os.path.join(base_output_dir, batch_folder, safe_title)
+    # 最终完整路径
+    article_dir = os.path.join(base_output_dir, folder_name)
     assets_dir = os.path.join(article_dir, "assets")
     
     if not os.path.exists(assets_dir):

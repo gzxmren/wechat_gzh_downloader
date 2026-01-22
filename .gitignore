@@ -1,1 +1,9 @@
-output/\n__pycache__/\n*.pyc\n*.log\ndebug_fail.html\n.env
+#output/\n__pycache__/\n*.pyc\n*.log\ndebug_fail.html\n.env
+
+./output
+./_pycache_
+*.pyc
+*.log
+.env
+debug_fail.html
+
