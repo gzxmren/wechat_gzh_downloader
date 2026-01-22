@@ -9,6 +9,7 @@ from core.downloader import fetch_article
 from core.converter import html_to_markdown
 from core.file_manager import prepare_article_dir, save_markdown, sanitize_filename
 from core.pdf_generator import generate_pdf
+from core.html_saver import save_full_html
 from core.db_decrypter import decrypt_wechat_db
 from core.db_parser import parse_favorite_db, save_urls_to_file
 
@@ -33,8 +34,9 @@ def parse_args():
     parser.add_argument("--db", action="store_true", help="启用数据库读取模式")
     
     # 功能开关
+    parser.add_argument("--markdown", action="store_true", help="启用 Markdown 生成 (默认关闭)")
+    parser.add_argument("--pdf", action="store_true", help="启用 PDF 生成 (默认关闭)")
     parser.add_argument("--no-images", action="store_true", help="禁用图片下载")
-    parser.add_argument("--no-pdf", action="store_true", help="禁用 PDF 生成")
     parser.add_argument("--retry", type=int, default=1, help="单次运行的失败重试次数")
     parser.add_argument("--force", action="store_true", help="强制处理所有 URL (忽略历史记录)")
     
@@ -93,7 +95,6 @@ def process_single_url(url, args, today_str):
             return result
             
         title = article_data['title']
-        author = article_data.get('author', 'Unknown')
         # 优先使用文章实际发布日期，如果没有则使用当前日期
         publish_date = article_data.get('publish_date') or today_str
         
@@ -101,30 +102,43 @@ def process_single_url(url, args, today_str):
         print(f"  -> 日期: {publish_date}")
         
         # 2. 准备目录
-        # 注意：这里我们使用 publish_date 来生成文件夹，这样归档更准确
         article_dir, assets_dir = prepare_article_dir(args.user, publish_date, title, args.output)
         
-        # 3. 转换
+        # 3. 转换 HTML 并本地化图片
         download_images = not args.no_images
-        md_content, processed_html = html_to_markdown(
+        
+        # 即使不生成 Markdown，也需要获取处理后的 HTML 内容用于 HTML 和 PDF
+        # 注意：html_to_markdown 返回的第二个值就是处理后的 HTML
+        md_content, processed_html_content = html_to_markdown(
             article_data['content_html'], title, article_data['original_url'],
             assets_dir=assets_dir if download_images else None,
             download_images=download_images
         )
         
-        # 4. 保存 Markdown
         safe_title = sanitize_filename(title)
-        md_path = os.path.join(article_dir, f"{safe_title}.md")
-        if not save_markdown(md_path, md_content):
-            result.update({"stage": "save_md", "error": "Save Markdown failed"})
-            return result
-        print(f"  -> [OK] Markdown 保存成功")
-        
-        # 5. 生成 PDF
-        if not args.no_pdf:
-            pdf_path = os.path.join(article_dir, f"{safe_title}.pdf")
-            if generate_pdf(processed_html, title, pdf_path, assets_dir):
-                print(f"  -> [OK] PDF 生成成功")
+
+        # --- HTML 生成 (默认始终生成) ---
+        html_output_path = os.path.join(article_dir, f"{safe_title}.html")
+        if save_full_html(processed_html_content, title, html_output_path, assets_dir):
+            print(f"  -> [OK] HTML 保存成功")
+        else:
+            result.update({"stage": "save_html", "error": "HTML save failed"})
+            return result # HTML 保存失败，则直接返回
+
+        # --- Markdown 生成 (根据 --markdown 参数决定) ---
+        if args.markdown:
+            md_path = os.path.join(article_dir, f"{safe_title}.md")
+            if save_markdown(md_path, md_content): # 修正参数顺序
+                print("  -> [OK] Markdown 保存成功")
+            else:
+                result.update({"stage": "save_md", "error": "Markdown save failed"})
+                return result
+
+        # --- PDF 生成 (根据 --pdf 参数决定) ---
+        if args.pdf:
+            pdf_output_path = os.path.join(article_dir, f"{safe_title}.pdf")
+            if generate_pdf(processed_html_content, title, pdf_output_path, assets_dir):
+                print("  -> [OK] PDF 生成成功")
             else:
                 result.update({"stage": "pdf", "error": "PDF generation failed"})
                 return result
@@ -137,7 +151,7 @@ def process_single_url(url, args, today_str):
 
 def main():
     args = parse_args()
-    print(f"--- 微信公众号文章下载器 v3.4 (断点续传) ---")
+    print(f"--- 微信公众号文章下载器 v4.0 (断点续传) ---")
     
     # 1. 加载历史记录
     history_file = "history.log"
