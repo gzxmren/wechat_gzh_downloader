@@ -3,16 +3,10 @@ import os
 
 def generate_pdf(html_content, title, output_path, assets_dir):
     """
-    将微信文章 HTML 转换为 PDF 文件。
-    
-    Args:
-        html_content (str): 已经过图片本地化处理的 HTML 片段 (js_content)
-        title (str): 文章标题
-        output_path (str): PDF 保存的完整路径
-        assets_dir (str): 本地图片目录的绝对路径，用于渲染
+    将微信文章 HTML 转换为 PDF。具备环境自适应能力：
+    优先尝试生成带目录和页码的高级 PDF，若环境不支持则退化为普通 PDF。
     """
     # 1. 构造完整的 HTML 文档
-    # 注意：在 f-string 中，CSS 的花括号必须双写 {{ }} 以转义
     full_html = f"""
     <!DOCTYPE html>
     <html>
@@ -20,29 +14,18 @@ def generate_pdf(html_content, title, output_path, assets_dir):
         <meta charset="UTF-8">
         <title>{title}</title>
         <style>
-            body {{ font-family: "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.6; color: #333; padding: 20px; }}
-            img {{ max-width: 100%; height: auto; display: block; margin: 10px 0; }}
-            .rich_media_title {{ font-size: 24px; font-weight: bold; margin-bottom: 20px; }}
-            blockquote {{ border-left: 4px solid #eee; padding-left: 10px; color: #666; }}
-            
-            /* 关键修复：强制显示内容，覆盖微信默认的 visibility: hidden */
-            #js_content, .rich_media_content {{ visibility: visible !important; opacity: 1 !important; }}
-            
-            /* 代码块与引用样式增强 */
-            pre, code {{ font-family: Consolas, "Courier New", monospace; background-color: #f6f8fa; padding: 3px; border-radius: 3px; }}
-            pre {{ display: block; padding: 10px; overflow-x: auto; white-space: pre-wrap; border: 1px solid #ddd; background-color: #f6f8fa; color: #333; }}
-            pre code {{ padding: 0; border: none; background: none; }}
-            
-            /* 微信特定的代码块容器修复 */
-            .code-snippet__rich_wrap, section[data-role="code"] {{ 
-                background-color: #f6f8fa !important; 
-                border: 1px solid #e1e4e8 !important;
-                padding: 10px !important;
-                margin: 10px 0 !important;
-                border-radius: 4px !important;
-                display: block !important;
-                visibility: visible !important;
+            @page {{ margin: 20mm; }}
+            body {{ 
+                font-family: "PingFang SC", "Microsoft YaHei", sans-serif; 
+                line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto;
             }}
+            h1, h2, h3, h4, h5, h6 {{ page-break-after: avoid; color: #2c3e50; }}
+            img {{ max-width: 100%; height: auto; display: block; margin: 15px 0; border-radius: 4px; }}
+            .rich_media_title {{ font-size: 28px; font-weight: bold; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 10px; }}
+            pre, blockquote {{ page-break-inside: avoid; }}
+            blockquote {{ border-left: 5px solid #dfe2e5; padding: 10px 15px; color: #6a737d; background: #fafbfc; margin: 20px 0; }}
+            #js_content, .rich_media_content {{ visibility: visible !important; opacity: 1 !important; }}
+            pre {{ display: block; padding: 16px; overflow-x: auto; white-space: pre-wrap; background-color: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; font-size: 13px; }}
         </style>
     </head>
     <body>
@@ -54,31 +37,45 @@ def generate_pdf(html_content, title, output_path, assets_dir):
     </html>
     """
     
-    # 2. 修正图片路径：pdfkit 渲染时需要绝对路径才能找到 assets 里的图片
+    # 2. 修正图片路径
     if assets_dir:
         abs_assets_dir = os.path.abspath(assets_dir)
-        # 将 src="assets/xxx" 替换为 src="file:///abs/path/assets/xxx"
-        # 注意：这里要处理可能的斜杠方向问题，但在 Linux 下通常没问题
         full_html = full_html.replace('src="assets/', f'src="file://{abs_assets_dir}/')
     
-    # 3. 配置选项
-    options = {
+    # 3. 基础配置
+    base_options = {
         'page-size': 'A4',
-        'margin-top': '0.75in',
-        'margin-right': '0.75in',
-        'margin-bottom': '0.75in',
-        'margin-left': '0.75in',
         'encoding': "UTF-8",
-        'enable-local-file-access': None, # 关键：允许读取本地 assets 文件夹
-        'no-outline': None,
+        'enable-local-file-access': None,
         'quiet': ''
     }
     
+    # 4. 高级配置（可能在某些 Linux 环境下不被支持）
+    advanced_options = {
+        **base_options,
+        'footer-center': '[page] / [toPage]',
+        'footer-font-size': '9',
+        'outline-depth': '3',
+    }
+    
+    toc = {
+        'toc-header-text': '目录',
+        'disable-dotted-lines': None,
+    }
+    
     try:
-        pdfkit.from_string(full_html, output_path, options=options)
+        # 尝试一：带目录和页码
+        pdfkit.from_string(full_html, output_path, options=advanced_options, toc=toc)
         return True
     except Exception as e:
-        print(f"[Error] PDF conversion failed: {e}")
-        if "wkhtmltopdf" in str(e).lower():
-            print(">>> 提示: 请确保系统已安装 wkhtmltopdf。在 Ubuntu/WSL 上运行: sudo apt install wkhtmltopdf")
+        # 尝试二：退化为普通 PDF
+        if "unpatched qt" in str(e).lower() or "switch" in str(e).lower():
+            try:
+                pdfkit.from_string(full_html, output_path, options=base_options)
+                print(f"  [Info] 环境限制，已生成不带目录和页码的普通 PDF")
+                return True
+            except Exception as e2:
+                print(f"[Error] PDF conversion fallback failed: {e2}")
+        else:
+            print(f"[Error] PDF conversion failed: {e}")
         return False

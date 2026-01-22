@@ -1,9 +1,13 @@
 #output/\n__pycache__/\n*.pyc\n*.log\ndebug_fail.html\n.env
 
-./output
-./_pycache_
+output/
+input/
+_pycache_/
 *.pyc
 *.log
 .env
 debug_fail.html
-
+.venv/
+*.db
+*.db-shm
+*.db-wal
