@@ -1,5 +1,6 @@
 import os
-import requests
+import aiohttp
+import aiofiles
 import hashlib
 from urllib.parse import urlparse
 
@@ -18,17 +19,18 @@ def get_image_extension(url, content_type):
     
     return '.jpg' # 默认
 
-def download_image(url, save_dir):
+async def download_image(url, save_dir, session=None):
     """
-    下载图片并保存到指定目录。
+    异步下载图片并保存到指定目录。
     使用 URL 的 MD5 哈希作为文件名，避免重复下载。
     
     Args:
         url (str): 图片 URL
         save_dir (str): 保存目录 (assets 文件夹路径)
+        session (aiohttp.ClientSession): 可选的 aiohttp 会话
         
     Returns:
-        str: 相对文件名 (例如 'image_abc123.jpg')，如果下载失败返回 None
+        str: 相对文件名 (例如 'abc123.jpg')，如果下载失败返回 None
     """
     if not url:
         return None
@@ -37,18 +39,12 @@ def download_image(url, save_dir):
         # 生成哈希文件名
         url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
         
-        # 简单防盗链 Header
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://mp.weixin.qq.com/"
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return None
+        # 确定扩展名 (初步根据 URL)
+        path = urlparse(url).path
+        ext = os.path.splitext(path)[1].lower()
+        if not ext:
+            ext = ".jpg" # 占位，稍后根据 response 修正
             
-        # 确定扩展名
-        ext = get_image_extension(url, response.headers.get('Content-Type', ''))
         filename = f"{url_hash}{ext}"
         save_path = os.path.join(save_dir, filename)
         
@@ -56,10 +52,40 @@ def download_image(url, save_dir):
         if os.path.exists(save_path):
             return filename
             
-        with open(save_path, "wb") as f:
-            f.write(response.content)
+        # 简单防盗链 Header
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://mp.weixin.qq.com/"
+        }
+        
+        close_session = False
+        if session is None:
+            session = aiohttp.ClientSession()
+            close_session = True
             
-        return filename
+        try:
+            async with session.get(url, headers=headers, timeout=10) as response:
+                if response.status != 200:
+                    return None
+                
+                content = await response.read()
+                
+                # 根据真实 Content-Type 修正扩展名
+                real_ext = get_image_extension(url, response.headers.get('Content-Type', ''))
+                if real_ext != ext:
+                    filename = f"{url_hash}{real_ext}"
+                    save_path = os.path.join(save_dir, filename)
+                    if os.path.exists(save_path):
+                        return filename
+                
+                # 异步写入文件
+                async with aiofiles.open(save_path, mode='wb') as f:
+                    await f.write(content)
+                    
+                return filename
+        finally:
+            if close_session:
+                await session.close()
         
     except Exception as e:
         print(f"[Warning] Image download failed: {url} -> {e}")

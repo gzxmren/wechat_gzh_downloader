@@ -1,10 +1,21 @@
 import pdfkit
 import os
+import asyncio
 
-def generate_pdf(html_content, title, output_path, assets_dir):
+# PDF 生成是进程密集型任务，限制并发数以保护 CPU
+PDF_SEMAPHORE = asyncio.Semaphore(2)
+
+async def generate_pdf(html_content, title, output_path, assets_dir):
     """
-    将微信文章 HTML 转换为 PDF。具备环境自适应能力：
-    优先尝试生成带目录和页码的高级 PDF，若环境不支持则退化为普通 PDF。
+    异步将微信文章 HTML 转换为 PDF。
+    使用 asyncio.to_thread 运行阻塞的 pdfkit 调用，并使用信号量控制并发。
+    """
+    async with PDF_SEMAPHORE:
+        return await asyncio.to_thread(_generate_pdf_sync, html_content, title, output_path, assets_dir)
+
+def _generate_pdf_sync(html_content, title, output_path, assets_dir):
+    """
+    同步生成 PDF 的逻辑，被包装在 generate_pdf 中。
     """
     # 1. 构造完整的 HTML 文档
     full_html = f"""
@@ -50,7 +61,7 @@ def generate_pdf(html_content, title, output_path, assets_dir):
         'quiet': ''
     }
     
-    # 4. 高级配置（可能在某些 Linux 环境下不被支持）
+    # 4. 高级配置
     advanced_options = {
         **base_options,
         'footer-center': '[page] / [toPage]',
@@ -72,7 +83,6 @@ def generate_pdf(html_content, title, output_path, assets_dir):
         if "unpatched qt" in str(e).lower() or "switch" in str(e).lower():
             try:
                 pdfkit.from_string(full_html, output_path, options=base_options)
-                print(f"  [Info] 环境限制，已生成不带目录和页码的普通 PDF")
                 return True
             except Exception as e2:
                 print(f"[Error] PDF conversion fallback failed: {e2}")

@@ -2,16 +2,17 @@ import os
 import datetime
 import argparse
 import sys
-import getpass
 import re
-import time
+import asyncio
+import aiohttp
+import random
 from core.downloader import fetch_article
 from core.converter import html_to_markdown
 from core.file_manager import prepare_article_dir, save_markdown, save_metadata, sanitize_filename
 from core.pdf_generator import generate_pdf
 from core.html_saver import save_full_html
 from core.db_decrypter import decrypt_wechat_db
-from core.db_parser import parse_favorite_db, save_urls_to_file
+from core.db_parser import parse_favorite_db
 from core.index_manager import generate_global_index
 
 def parse_args():
@@ -21,7 +22,7 @@ def parse_args():
     default_output = os.path.join(base_dir, "output")
 
     parser = argparse.ArgumentParser(
-        description="微信公众号文章批量下载工具 (WeChat Fav Downloader)",
+        description="微信公众号文章批量下载工具 (WeChat Fav Downloader) v4.5 Async",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
@@ -29,6 +30,9 @@ def parse_args():
     parser.add_argument("-i", "--input", default=default_input, help="输入 URL 文件路径")
     parser.add_argument("-o", "--output", default=default_output, help="输出目录路径")
     parser.add_argument("-u", "--user", default="MyWeChatUser", help="微信用户名前缀")
+    
+    # 并发控制
+    parser.add_argument("--concurrency", type=int, default=3, help="全局并发处理文章数 (默认: 3)")
     
     # 模式选择
     parser.add_argument("--chat-log", help="指定导出的聊天记录文件 (txt格式)")
@@ -85,99 +89,88 @@ def extract_urls_from_log(log_path):
     except: pass
     return urls
 
-def process_single_url(url, args, today_str):
-    """处理单个 URL 的核心逻辑"""
-    result = {"success": False, "stage": "init", "error": None}
-    try:
-        # 1. 下载
-        article_data = fetch_article(url)
-        if not article_data:
-            result.update({"stage": "download", "error": "Download failed"})
-            return result
+async def process_single_url(url, args, today_str, session, semaphore):
+    """处理单个 URL 的异步核心逻辑"""
+    async with semaphore:
+        result = {"success": False, "stage": "init", "error": None, "url": url}
+        try:
+            # 1. 下载 (内部已有随机延迟)
+            article_data = await fetch_article(url, session=session)
+            if not article_data:
+                result.update({"stage": "download", "error": "Download failed"})
+                return result
+                
+            title = article_data['title']
+            author = article_data['author']
+            publish_date = article_data.get('publish_date') or today_str
             
-        title = article_data['title']
-        author = article_data['author']
-        # 优先使用文章实际发布日期，如果没有则使用当前日期
-        publish_date = article_data.get('publish_date') or today_str
-        
-        print(f"  -> 标题: {title}")
-        print(f"  -> 日期: {publish_date}")
-        
-        # 2. 准备目录
-        article_dir, assets_dir = prepare_article_dir(args.user, publish_date, title, args.output)
-        safe_title = sanitize_filename(title)
-        
-        # 3. 转换 HTML 并本地化图片
-        download_images = not args.no_images
-        
-        # 即使不生成 Markdown，也需要获取处理后的 HTML 内容用于 HTML 和 PDF
-        # 注意：html_to_markdown 返回的第二个值就是处理后的 HTML
-        md_content, processed_html_content = html_to_markdown(
-            article_data['content_html'], title, article_data['original_url'],
-            assets_dir=assets_dir if download_images else None,
-            download_images=download_images
-        )
-        
-        # --- Metadata 保存 ---
-        metadata = {
-            "title": title,
-            "author": author,
-            "publish_date": publish_date,
-            "original_url": article_data['original_url'],
-            "download_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "tags": [], # 预留
-            "description": "" # 预留
-        }
-        metadata_path = os.path.join(article_dir, "metadata.json")
-        if save_metadata(metadata_path, metadata):
-            print("  -> [OK] Metadata 保存成功")
+            print(f"\n[Processing] {title}")
+            
+            # 2. 准备目录
+            article_dir, assets_dir = prepare_article_dir(args.user, publish_date, title, args.output)
+            safe_title = sanitize_filename(title)
+            
+            # 3. 转换 HTML 并本地化图片 (异步并行下载)
+            download_images = not args.no_images
+            
+            md_content, processed_html_content = await html_to_markdown(
+                article_data['content_html'], title, article_data['original_url'],
+                assets_dir=assets_dir if download_images else None,
+                download_images=download_images,
+                session=session
+            )
+            
+            # --- Metadata 保存 ---
+            metadata = {
+                "title": title,
+                "author": author,
+                "publish_date": publish_date,
+                "original_url": article_data['original_url'],
+                "download_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            metadata_path = os.path.join(article_dir, "metadata.json")
+            await save_metadata(metadata_path, metadata)
 
-        # --- HTML 生成 (默认始终生成) ---
-        html_output_path = os.path.join(article_dir, f"{safe_title}.html")
-        if save_full_html(processed_html_content, title, html_output_path, assets_dir):
-            print(f"  -> [OK] HTML 保存成功")
-        else:
-            result.update({"stage": "save_html", "error": "HTML save failed"})
-            return result # HTML 保存失败，则直接返回
-
-        # --- Markdown 生成 (根据 --markdown 参数决定) ---
-        if args.markdown:
-            md_path = os.path.join(article_dir, f"{safe_title}.md")
-            if save_markdown(md_path, md_content): # 修正参数顺序
-                print("  -> [OK] Markdown 保存成功")
-            else:
-                result.update({"stage": "save_md", "error": "Markdown save failed"})
+            # --- HTML 生成 (默认始终生成) ---
+            html_output_path = os.path.join(article_dir, f"{safe_title}.html")
+            if not await save_full_html(processed_html_content, title, html_output_path, assets_dir):
+                result.update({"stage": "save_html", "error": "HTML save failed"})
                 return result
 
-        # --- PDF 生成 (根据 --pdf 参数决定) ---
-        if args.pdf:
-            pdf_output_path = os.path.join(article_dir, f"{safe_title}.pdf")
-            if generate_pdf(processed_html_content, title, pdf_output_path, assets_dir):
-                print("  -> [OK] PDF 生成成功")
-            else:
-                result.update({"stage": "pdf", "error": "PDF generation failed"})
-                return result
+            # --- Markdown 生成 ---
+            if args.markdown:
+                md_path = os.path.join(article_dir, f"{safe_title}.md")
+                await save_markdown(md_path, md_content)
 
-        result["success"] = True
-        return result
-    except Exception as e:
-        result["error"] = str(e)
-        return result
+            # --- PDF 生成 ---
+            if args.pdf:
+                pdf_output_path = os.path.join(article_dir, f"{safe_title}.pdf")
+                if not await generate_pdf(processed_html_content, title, pdf_output_path, assets_dir):
+                    result.update({"stage": "pdf", "error": "PDF generation failed"})
+                    return result
 
-def main():
+            result["success"] = True
+            print(f"  -> [OK] {title} 处理完成")
+            return result
+        except Exception as e:
+            result["error"] = str(e)
+            return result
+
+async def async_main():
     args = parse_args()
-    print(f"--- 微信公众号文章下载器 v4.0 (断点续传) ---")
+    print(f"--- 微信公众号文章下载器 v4.5 (Async Concurrency) ---")
     
     # 1. 加载历史记录
     history_file = "history.log"
     history_set = load_history(history_file)
     if not args.force:
-        print(f"已加载历史记录，将自动跳过 {len(history_set)} 个已处理链接。")
+        print(f"已加载历史记录，将跳过 {len(history_set)} 个链接。")
     
     # 2. 收集目标 URLs
     all_target_urls = []
     if args.db:
-        all_target_urls = [a['url'] for a in parse_favorite_db(args.decrypted_db)] # 简化版逻辑
+        # TODO: 数据库解密目前仍是同步的，后续可优化
+        all_target_urls = [a['url'] for a in parse_favorite_db(args.decrypted_db)]
     elif args.chat_log:
         all_target_urls = extract_urls_from_log(args.chat_log)
     else:
@@ -185,56 +178,49 @@ def main():
             with open(args.input, "r", encoding="utf-8") as f:
                 all_target_urls = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
 
-    # 3. 过滤掉历史记录中的 URL
-    if args.force:
-        target_urls = all_target_urls
-    else:
-        target_urls = [u for u in all_target_urls if u not in history_set]
-        skip_count = len(all_target_urls) - len(target_urls)
-        if skip_count > 0:
-            print(f"过滤完成：跳过 {skip_count} 个已处理链接，剩余 {len(target_urls)} 个新任务。")
-
+    # 3. 过滤 URL
+    target_urls = all_target_urls if args.force else [u for u in all_target_urls if u not in history_set]
     if not target_urls:
         print("[Info] 没有新任务需要处理。")
-        # 即使没有新任务，也可以尝试重建索引
-        print("\n检查并重建全局索引 (index.html)...")
         generate_global_index(args.output)
         return
 
+    print(f"待处理任务: {len(target_urls)} 个，并发数限制: {args.concurrency}")
+
     today_str = datetime.date.today().strftime("%Y-%m-%d")
-    failed_items = []
-    success_count = 0
+    semaphore = asyncio.Semaphore(args.concurrency)
     
-    # 第一轮主循环
-    for i, url in enumerate(target_urls, 1):
-        print(f"\n[{i}/{len(target_urls)}] 处理中: {url}")
-        res = process_single_url(url, args, today_str)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for url in target_urls:
+            # 加入微小的 staggered start 延迟，避免瞬间爆发请求
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+            tasks.append(process_single_url(url, args, today_str, session, semaphore))
         
+        results = await asyncio.gather(*tasks)
+
+    # 统计与扫尾
+    success_count = 0
+    failed_items = []
+    for res in results:
         if res["success"]:
             success_count += 1
-            append_history(url, history_file)
+            append_history(res["url"], history_file)
         else:
-            print(f"  -> [Error] 在 {res['stage']} 阶段失败: {res['error']}")
-            log_error(url, f"Stage: {res['stage']}, Msg: {res['error']}")
-            failed_items.append(url)
+            print(f"[Error] {res['url']} 失败 ({res['stage']}): {res['error']}")
+            log_error(res["url"], f"Stage: {res['stage']}, Msg: {res['error']}")
+            failed_items.append(res["url"])
 
-    # 自动重试逻辑 (同 v3.2)
-    if failed_items and args.retry > 0:
-        print(f"\n开始重试 {len(failed_items)} 个失败任务...")
-        for i, url in enumerate(failed_items, 1):
-            time.sleep(3)
-            res = process_single_url(url, args, today_str)
-            if res["success"]:
-                success_count += 1
-                append_history(url, history_file)
-            
-    print(f"\n--- 全部完成 ---")
-    print(f"新处理成功: {success_count} / 本次任务: {len(target_urls)}")
-    print(f"累计成功记录: {len(load_history(history_file))}")
+    print(f"\n--- 处理摘要 ---")
+    print(f"任务总数: {len(target_urls)}")
+    print(f"成功: {success_count}")
+    print(f"失败: {len(failed_items)}")
     
-    # 4. 重建全局索引
-    print("\n正在重建全局索引 (index.html)...")
+    print("\n正在更新全局索引...")
     generate_global_index(args.output)
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(async_main())
+    except KeyboardInterrupt:
+        print("\n[User Interrupt] 程序已停止。")

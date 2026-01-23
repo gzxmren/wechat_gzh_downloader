@@ -2,37 +2,35 @@
 
 本文档描述 **WeChat Fav Downloader** 的最新架构，重点介绍 v3.x 引入的容错与自动化机制。
 
-## 1. 架构图 (Updated)
+## 1. 架构图 (v4.5 Async)
 
 ```mermaid
 graph TD
-    A[get_wx_gzh.py] --> B(Downloader)
-    A --> C(Converter)
-    A --> D(FileManager)
+    A[get_wx_gzh.py] --> B(Downloader - Async)
+    A --> C(Converter - Async)
+    A --> D(FileManager - Async)
     A --> E(HistoryManager)
     A --> M(MetadataExtractor)
-    A --> HS(HtmlSaver)  // New: HTML Saver
+    A --> HS(HtmlSaver - Async)
     
-    subgraph Core Features
-    B -- 网络请求 (含Random Delay) --> C
-    C -- 标准 HTML 优先解析 --> C
-    C -- 资源本地化 (ImageHandler) --> D
-    M -- 提取发布日期/作者 --> A
-    D -- 检查本地 assets 重复 --> D
-    end
-    
-    subgraph Data Source
-    F[urls.txt] --> A
-    G[messages.txt] -- Regex Extract --> A
-    H[Favorite.db] -- Decrypt/Parse --> A
+    subgraph Async Core
+    B -- aiohttp (含Semaphore控制) --> C
+    C -- asyncio.gather并行下载图片 --> C
+    D -- aiofiles 异步写入 --> D
     end
 ```
 
 ## 2. 关键机制设计
 
-### 2.1 断点续传 (Resumability)
-*   **状态存储**: 使用 `history.log` 记录所有完全成功的处理单元（MD + PDF 均生成成功）。
-*   **幂等性**: 启动时将 `history.log` 载入 `set`。在每篇文章开始前进行 `O(1)` 时间复杂度的检查。若已存在且未开启 `--force`，则秒速跳过。
+### 2.1 异步并发与速率控制 (Async & Rate Limiting)
+*   **全局信号量 (Semaphore)**: 通过 `--concurrency` 控制物理层面的最大并发文章数（默认 3），平衡抓取速度与账号安全。
+*   **连接池复用**: 使用 `aiohttp.ClientSession` 管理长连接，大幅减少高频抓取时的 TCP 握手开销。
+*   **并行资源下载**: 单篇文章内的所有图片采用 `asyncio.gather` 并行下载，极速缩短富媒体文章的处理时间。
+*   **交错启动 (Staggered Start)**: 任务启动时加入 `0.5s - 1.5s` 的随机微延迟，模拟人类连续点击行为，增强反爬能力。
+*   **非阻塞 I/O**: 文件保存和元数据写入均采用 `aiofiles`，确保高并发下主循环不会因磁盘等待而卡死。
+
+### 2.2 外部进程隔离 (Process Isolation)
+*   **PDF 生成**: 由于 `wkhtmltopdf` 是资源密集型进程，程序使用独立的 `PDF_SEMAPHORE` (限制并发为 2) 并在 `asyncio.to_thread` 中运行，防止 CPU 被瞬时压垮。
 
 ### 2.2 自动重试与错误隔离 (Fault Tolerance)
 *   **分段捕获**: 程序将下载、转换、IO 分为不同阶段。
