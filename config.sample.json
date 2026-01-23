@@ -1,0 +1,13 @@
+{
+    "comment": "请将此文件重命名为 config.json 并填入你的 Cookie。User-Agent 可选，删除则使用默认值。",
+    "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Cookie": "wap_sid2=...; wxsid=...; wxuin=...;"
+    },
+    "request_settings": {
+        "timeout": 15,
+        "max_retries": 3,
+        "sleep_min": 3,
+        "sleep_max": 6
+    }
+}

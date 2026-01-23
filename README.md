@@ -51,6 +51,16 @@ sudo apt install wkhtmltopdf
 python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
 ```
 
+## ⚙️ 高级配置 (Advanced Config)
+
+为了应对微信的反爬虫机制或下载特定权限的文章，您可以创建 `config.json` 来配置自定义 Header。
+
+1. 将 `config.sample.json` 重命名为 `config.json`。
+2. 在浏览器中获取您的 `Cookie` 和 `User-Agent`。
+3. 填入 `config.json` 相应字段。
+
+该文件已被 `.gitignore` 忽略，您的隐私数据不会被提交到仓库。
+
 ## ⚙️ 命令行参数
 
 | 参数 | 说明 | 默认值 |
@@ -71,7 +81,8 @@ python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
 *   [x] **v3.3**: 增加 `history.log` 实现断点续传和自动重试。
 *   [x] **v3.4**: 渲染逻辑重构，优化正文提取与扁平目录结构。
 *   [x] **v4.0**: 默认 HTML 输出、可选 Markdown/PDF、文件名智能截断、PDF 容错排版。
-*   [x] **v4.1 (Current)**: 元数据生成、全局 HTML 索引、正文内容智能清洗。
+*   [x] **v4.1**: 元数据生成、全局 HTML 索引、正文内容智能清洗。
+*   [x] **v4.2 (Current)**: 外部配置化支持 (Cookie/User-Agent)，增强反爬应对能力。
 *   [ ] **v5.0 (Planned)**: 多媒体深度支持（视频/语音下载）。
 
 ## 📝 许可证
