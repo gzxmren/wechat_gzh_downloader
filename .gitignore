@@ -12,3 +12,4 @@ debug_fail.html
 *.db-shm
 *.db-wal
 config.json
+debug_scripts/
