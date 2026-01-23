@@ -33,13 +33,20 @@ def process_wechat_html(html_content, assets_dir=None, download_images=False):
         content_div = soup # 如果找不到特定容器，就处理整个
     
     # 遍历所有图片
-    for img in content_div.find_all("img"):
+    imgs = content_div.find_all("img")
+    # print(f"  [Debug] Converter found {len(imgs)} images in content")
+    
+    for img in imgs:
+        # print(f"    [Debug] Raw img tag: {img}")
+        
         # 优先使用 data-src (微信图片的真实地址)
         img_url = img.get("data-src") or img.get("src")
+        # print(f"    [Debug] Extracted URL: {img_url}")
         
         if img_url:
             # 如果开启了图片下载且提供了目录
             if download_images and assets_dir:
+                # print(f"    -> Downloading: {img_url[:30]}...")
                 local_filename = download_image(img_url, assets_dir)
                 if local_filename:
                     # 替换为 Markdown 兼容的相对路径
