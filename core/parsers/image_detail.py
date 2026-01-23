@@ -66,7 +66,7 @@ class ImageDetailParser(BaseParser):
         
         for block in raw_blocks:
             # 在块内查找所有可能的 URL (因为可能存在空的占位符 cdn_url)
-            block_urls = re.findall(r'cdn_url:(?:JsDecode\()?(?:\'|\")(.*?)(?:\'|\")', block)
+            block_urls = re.findall(r'cdn_url:(?:JsDecode\()?(?:\'|")(.*?)(?:\'|")', block)
             
             img_url = None
             for u in block_urls:
@@ -83,23 +83,26 @@ class ImageDetailParser(BaseParser):
                     seen_urls.add(clean_key)
                     image_list.append(img_url)
 
-                if not image_list:
-
-                    return None
-
-                        
-
-                # print(f"  [Debug] Image List: {image_list}")
-
-                
-
-                # 6. 构建 HTML
-
+        if not image_list:
+            return None
             
-
-            content_html = '<div class="rich_media_content" id="js_content" style="visibility: visible;">'
-
+        # 6. 提取摘要/导语 (Description)
+        # 图片频道通常将文字内容放在 meta description 中
+        desc_text = ""
+        # 注意：此处使用原始 html 进行正则匹配，而非 clean_html，因为 content 中可能包含空格，不应移除
+        meta_desc_match = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', html, re.IGNORECASE)
+        if meta_desc_match:
+            raw_desc = meta_desc_match.group(1)
+            # 处理换行符 \x0a -> <br/>
+            desc_text = raw_desc.replace(r'\x0a', '<br/>').replace('\n', '<br/>')
+            
+        # 7. 构建 HTML
+        content_html = '<div class="rich_media_content" id="js_content" style="visibility: visible;">'
         
+        # 插入导语
+        if desc_text:
+            content_html += f'<div class="image_channel_desc" style="margin-bottom: 20px; font-size: 16px; line-height: 1.6; color: #333;">{desc_text}</div>'
+            
         for cur_url in image_list:
             # 处理转义
             if '\\x' in cur_url or '\\u' in cur_url:
@@ -108,10 +111,7 @@ class ImageDetailParser(BaseParser):
             content_html += f'<p><img data-src="{cur_url}" src="{cur_url}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" /></p><br/>'
         content_html += '</div>'
         
-        # 对于图片频道，标题和作者通常不在 picture_page_info_list 里
-        # 这里返回部分数据，由上层调度器补全 title/author (或在 StandardParser 里复用提取逻辑)
-        # 为了简单，我们这里先返回 content_html，标题留给后续处理或 Default 处理
         return {
             "content_html": content_html,
-            "type": "image_detail" # 标记类型
+            "type": "image_detail"
         }
