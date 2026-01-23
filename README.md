@@ -83,7 +83,8 @@ python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
 *   [x] **v3.4**: 渲染逻辑重构，优化正文提取与扁平目录结构。
 *   [x] **v4.0**: 默认 HTML 输出、可选 Markdown/PDF、文件名智能截断、PDF 容错排版。
 *   [x] **v4.1**: 元数据生成、全局 HTML 索引、正文内容智能清洗。
-*   [x] **v4.2 (Current)**: 外部配置化支持 (Cookie/User-Agent)，增强反爬应对能力。
+*   [x] **v4.2**: 外部配置化支持 (Cookie/User-Agent)，增强反爬应对能力。
+*   [x] **v4.3 (Current)**: 图片频道精准解析逻辑（括号平衡算法），彻底解决图片缺失与重复问题。
 *   [ ] **v5.0 (Planned)**: 多媒体深度支持（视频/语音下载）。
 
 ## 📝 许可证
