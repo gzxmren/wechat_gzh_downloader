@@ -197,7 +197,7 @@ def main():
     if not target_urls:
         print("[Info] 没有新任务需要处理。")
         # 即使没有新任务，也可以尝试重建索引
-        print("\n检查并重建全局索引...")
+        print("\n检查并重建全局索引 (index.html)...")
         generate_global_index(args.output)
         return
 
@@ -233,7 +233,7 @@ def main():
     print(f"累计成功记录: {len(load_history(history_file))}")
     
     # 4. 重建全局索引
-    print("\n正在重建全局索引 (README.md)...")
+    print("\n正在重建全局索引 (index.html)...")
     generate_global_index(args.output)
 
 if __name__ == "__main__":
