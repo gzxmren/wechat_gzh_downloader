@@ -1,5 +1,6 @@
 import os
 import re
+import json
 
 def sanitize_filename(name):
     """清理文件名中的非法字符"""
@@ -47,4 +48,16 @@ def save_markdown(file_path, content):
         return True
     except Exception as e:
         print(f"[Error] Failed to save file {file_path}: {e}")
+        return False
+
+def save_metadata(file_path, metadata):
+    """
+    保存元数据到 JSON 文件。
+    """
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"[Error] Failed to save metadata {file_path}: {e}")
         return False

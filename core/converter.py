@@ -5,11 +5,28 @@ from core.image_handler import download_image
 def process_wechat_html(html_content, assets_dir=None, download_images=False):
     """
     预处理 HTML：
-    1. 解决图片懒加载 (data-src -> src)
-    2. (可选) 下载图片并替换为本地路径
+    1. 清洗无关内容 (二维码、广告、工具栏)
+    2. 解决图片懒加载 (data-src -> src)
+    3. (可选) 下载图片并替换为本地路径
     """
     soup = BeautifulSoup(html_content, "lxml")
     
+    # --- 0. 内容清洗 (Content Cleaning) ---
+    selectors_to_remove = [
+        "script",                  # 脚本
+        "#js_pc_qr_code",          # 底部二维码 (PC端)
+        ".rich_media_tool",        # 底部工具栏 (阅读、点赞)
+        "#js_toobar3",             # 底部工具栏容器
+        ".rich_media_area_extra",  # 底部额外区域 (推荐阅读等)
+        "#js_view_source",         # "阅读原文"链接
+        ".reward_area",            # 赞赏区域
+        "#js_sponsor_ad_area"      # 广告区域
+    ]
+    
+    for selector in selectors_to_remove:
+        for tag in soup.select(selector):
+            tag.decompose() # 彻底移除标签
+
     # 查找正文区域，通常是 js_content
     content_div = soup.find(id="js_content")
     if not content_div:

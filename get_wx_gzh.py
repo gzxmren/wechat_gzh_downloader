@@ -7,11 +7,12 @@ import re
 import time
 from core.downloader import fetch_article
 from core.converter import html_to_markdown
-from core.file_manager import prepare_article_dir, save_markdown, sanitize_filename
+from core.file_manager import prepare_article_dir, save_markdown, save_metadata, sanitize_filename
 from core.pdf_generator import generate_pdf
 from core.html_saver import save_full_html
 from core.db_decrypter import decrypt_wechat_db
 from core.db_parser import parse_favorite_db, save_urls_to_file
+from core.index_manager import generate_global_index
 
 def parse_args():
     """解析命令行参数"""
@@ -95,6 +96,7 @@ def process_single_url(url, args, today_str):
             return result
             
         title = article_data['title']
+        author = article_data['author']
         # 优先使用文章实际发布日期，如果没有则使用当前日期
         publish_date = article_data.get('publish_date') or today_str
         
@@ -103,6 +105,7 @@ def process_single_url(url, args, today_str):
         
         # 2. 准备目录
         article_dir, assets_dir = prepare_article_dir(args.user, publish_date, title, args.output)
+        safe_title = sanitize_filename(title)
         
         # 3. 转换 HTML 并本地化图片
         download_images = not args.no_images
@@ -115,7 +118,19 @@ def process_single_url(url, args, today_str):
             download_images=download_images
         )
         
-        safe_title = sanitize_filename(title)
+        # --- Metadata 保存 ---
+        metadata = {
+            "title": title,
+            "author": author,
+            "publish_date": publish_date,
+            "original_url": article_data['original_url'],
+            "download_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "tags": [], # 预留
+            "description": "" # 预留
+        }
+        metadata_path = os.path.join(article_dir, "metadata.json")
+        if save_metadata(metadata_path, metadata):
+            print("  -> [OK] Metadata 保存成功")
 
         # --- HTML 生成 (默认始终生成) ---
         html_output_path = os.path.join(article_dir, f"{safe_title}.html")
@@ -181,6 +196,9 @@ def main():
 
     if not target_urls:
         print("[Info] 没有新任务需要处理。")
+        # 即使没有新任务，也可以尝试重建索引
+        print("\n检查并重建全局索引...")
+        generate_global_index(args.output)
         return
 
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -213,6 +231,10 @@ def main():
     print(f"\n--- 全部完成 ---")
     print(f"新处理成功: {success_count} / 本次任务: {len(target_urls)}")
     print(f"累计成功记录: {len(load_history(history_file))}")
+    
+    # 4. 重建全局索引
+    print("\n正在重建全局索引 (README.md)...")
+    generate_global_index(args.output)
 
 if __name__ == "__main__":
     main()
