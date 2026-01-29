@@ -1,0 +1,42 @@
+<div class="pagination">
+    <!-- Previous Link -->
+    {% if current_page > 1 %}
+        {% set prev_page = current_page - 1 %}
+        {% set prev_link = "index.html" if prev_page == 1 else "index_" ~ prev_page ~ ".html" %}
+        <a href="{{ prev_link }}" class="page-link">&laquo; 上一页</a>
+    {% else %}
+        <span class="page-link disabled">&laquo; 上一页</span>
+    {% endif %}
+
+    <!-- Page Numbers -->
+    {% set visible_pages = [] %}
+    {% for p in [1, total_pages, current_page, current_page-1, current_page+1, current_page-2, current_page+2] %}
+        {% if p >= 1 and p <= total_pages %}
+            {% if p not in visible_pages %}
+                {% set _ = visible_pages.append(p) %}
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+    {% set sorted_pages = visible_pages | sort %}
+    
+    {% set last_p = namespace(val=0) %}
+    {% for p in sorted_pages %}
+        {% if p > last_p.val + 1 %}
+            <span class="ellipsis">...</span>
+        {% endif %}
+        
+        {% set link = "index.html" if p == 1 else "index_" ~ p ~ ".html" %}
+        {% set active_class = "active" if p == current_page else "" %}
+        <a href="{{ link }}" class="page-link {{ active_class }}">{{ p }}</a>
+        
+        {% set last_p.val = p %}
+    {% endfor %}
+
+    <!-- Next Link -->
+    {% if current_page < total_pages %}
+        {% set next_link = "index_" ~ (current_page + 1) ~ ".html" %}
+        <a href="{{ next_link }}" class="page-link">下一页 &raquo;</a>
+    {% else %}
+        <span class="page-link disabled">下一页 &raquo;</span>
+    {% endif %}
+</div>

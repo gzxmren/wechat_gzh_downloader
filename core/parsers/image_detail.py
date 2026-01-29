@@ -1,17 +1,26 @@
 import re
 from .base import BaseParser
+from .registry import register_parser
 
+@register_parser
 class ImageDetailParser(BaseParser):
     """
     针对微信“图片频道” (image_detail) 的解析器。
     使用括号平衡算法和对象块隔离逻辑。
     """
     
+    def can_handle(self, html, url) -> bool:
+        clean_html = re.sub(r'\s+', '', html)
+        return 'picture_page_info_list=[' in clean_html or 'window.picture_page_info_list=[' in clean_html
+
     def parse(self, html, url):
-        # 1. 全局预处理：移除所有空白字符
+        # 1. 提取通用元数据
+        title, author, publish_date = self.extract_common_metadata(html)
+
+        # 2. 全局预处理：移除所有空白字符
         clean_html = re.sub(r'\s+', '', html)
         
-        # 2. 特征检测与定位
+        # 3. 特征检测与定位
         start_marker = 'picture_page_info_list=['
         start_idx = clean_html.find(start_marker)
         
@@ -22,7 +31,7 @@ class ImageDetailParser(BaseParser):
         if start_idx == -1:
             return None
             
-        # 3. 精确截取：括号平衡算法
+        # 4. 精确截取：括号平衡算法
         array_start = start_idx + len(start_marker) - 1 # 指向 '['
         bracket_count = 0
         array_end = -1
@@ -47,7 +56,7 @@ class ImageDetailParser(BaseParser):
         if target_str.startswith('['): target_str = target_str[1:]
         if target_str.endswith(']'): target_str = target_str[:-1]
 
-        # 4. 拆分对象块
+        # 5. 拆分对象块
         raw_blocks = []
         curr_block = ""
         nest_level = 0
@@ -60,13 +69,13 @@ class ImageDetailParser(BaseParser):
                     raw_blocks.append(curr_block)
                     curr_block = ""
 
-        # 5. 提取 URL
+        # 6. 提取 URL
         image_list = []
         seen_urls = set()
         
         for block in raw_blocks:
             # 在块内查找所有可能的 URL (因为可能存在空的占位符 cdn_url)
-            block_urls = re.findall(r'cdn_url:(?:JsDecode\()?(?:\'|")(.*?)(?:\'|")', block)
+            block_urls = re.findall(r'cdn_url:(?:JsDecode\()?(?:\'|\")(.*?)(?:\'|\")', block)
             
             img_url = None
             for u in block_urls:
@@ -86,25 +95,18 @@ class ImageDetailParser(BaseParser):
         if not image_list:
             return None
             
-        # 6. 提取摘要/导语 (Description)
-        # 图片频道通常将文字内容放在 meta description 中
+        # 7. 提取摘要/导语 (Description)
         desc_text = ""
-        # 注意：此处使用原始 html 进行正则匹配，而非 clean_html，因为 content 中可能包含空格，不应移除
         meta_desc_match = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', html, re.IGNORECASE)
         if meta_desc_match:
             raw_desc = meta_desc_match.group(1)
-            # 处理换行符 \x0a -> <br/>
             desc_text = raw_desc.replace(r'\x0a', '<br/>').replace('\n', '<br/>')
             
-        # 7. 构建 HTML
+        # 8. 构建 HTML
         content_html = '<div class="rich_media_content" id="js_content" style="visibility: visible;">'
-        
-        # 插入导语
         if desc_text:
             content_html += f'<div class="image_channel_desc" style="margin-bottom: 20px; font-size: 16px; line-height: 1.6; color: #333;">{desc_text}</div>'
-            
         for cur_url in image_list:
-            # 处理转义
             if '\\x' in cur_url or '\\u' in cur_url:
                 try: cur_url = cur_url.encode('utf-8').decode('unicode_escape')
                 except: pass
@@ -112,6 +114,10 @@ class ImageDetailParser(BaseParser):
         content_html += '</div>'
         
         return {
+            "title": title,
+            "author": author,
+            "publish_date": publish_date,
             "content_html": content_html,
+            "original_url": url,
             "type": "image_detail"
         }

@@ -52,6 +52,23 @@ sudo apt install wkhtmltopdf
 python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
 ```
 
+## ⚙️ 基础配置 (Basic Config)
+
+从 v4.6 开始，支持使用项目根目录下的 `.env` 文件进行快速参数配置（推荐）。
+
+1. 复制 `.env.sample` (如果存在) 或直接新建 `.env` 文件。
+2. 常用配置项：
+   ```ini
+   # 全局并发控制 (默认 3)
+   CONCURRENCY=3
+   
+   # 索引页每页显示文章数 (默认 20)
+   PAGE_SIZE=20
+   
+   # 日志级别 (INFO/DEBUG/ERROR)
+   LOG_LEVEL=INFO
+   ```
+
 ## ⚙️ 高级配置 (Advanced Config)
 
 为了应对微信的反爬虫机制或下载特定权限的文章，您可以创建 `config.json` 来配置自定义 Header。

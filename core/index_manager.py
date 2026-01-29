@@ -50,214 +50,132 @@ def update_index(index_path, date_str, title, author, relative_path, url):
     except Exception as e:
         print(f"[Warning] 更新索引失败: {e}")
 
+import os
+import datetime
+import json
+from urllib.parse import quote
+from jinja2 import Environment, FileSystemLoader
+from .config import settings
+from .logger import logger
+
+def init_index_file(index_path):
+    """
+    Deprecated: Initialization is now handled via template rendering.
+    Kept for backward compatibility if needed by other modules (unlikely).
+    """
+    pass
+
+def update_index(index_path, date_str, title, author, relative_path, url):
+    """
+    追加一条索引记录 (Legacy Mode).
+    注意：在 v4.6+ 分页模式下，该函数仅用于单次追加，并不推荐混用。
+    """
+    # 简单的追加逻辑保留，但不再是核心路径
+    if not os.path.exists(index_path):
+        with open(index_path, "w", encoding="utf-8") as f:
+             f.write(f"| {date_str} | {title} | {author} | [Link]({relative_path}) | [Orig]({url}) |\n")
+    else:
+        try:
+            with open(index_path, "a", encoding="utf-8") as f:
+                f.write(f"| {date_str} | {title} | {author} | [Link]({relative_path}) | [Orig]({url}) |\n")
+        except Exception as e:
+            logger.warning(f"更新索引失败: {e}")
+
 def generate_global_index(output_root):
-
     """
-
     扫描 output 目录，基于 metadata.json 重建全局索引 HTML。
-
+    使用 Jinja2 模板引擎与 core.config 配置。
     """
-
-    index_path = os.path.join(output_root, "index.html")
-
+    # 1. 准备环境
+    page_size = settings.PAGE_SIZE
     
+    # 设置 Jinja2 环境
+    env = Environment(loader=FileSystemLoader(str(settings.TEMPLATE_DIR)))
+    # 注册 URL 编码过滤器
+    env.filters['url_quote'] = quote
+    
+    try:
+        template = env.get_template('index.html')
+    except Exception as e:
+        logger.error(f"无法加载模板 index.html: {e}")
+        return False
 
+    # 2. 收集数据
     records = []
-
     for root, dirs, files in os.walk(output_root):
-
         if "metadata.json" in files:
-
             meta_path = os.path.join(root, "metadata.json")
-
             try:
-
                 with open(meta_path, "r", encoding="utf-8") as f:
-
                     meta = json.load(f)
-
                     
-
                     # 寻找 HTML 文件
-
                     target_file = None
-
                     for file in files:
-
-                        if file.endswith(".html") and file != "index.html":
-
+                        if file.endswith(".html") and file != "index.html" and not file.startswith("index_"):
                             target_file = file
-
                             break
-
                     
-
                     if target_file:
-
                         rel_dir = os.path.relpath(root, output_root)
-
                         rel_path = os.path.join(rel_dir, target_file).replace("\\", "/")
-
                         
-
                         records.append({
-
                             "date": meta.get("publish_date", "Unknown"),
-
                             "title": meta.get("title", "No Title"),
-
                             "author": meta.get("author", "Unknown"),
-
                             "path": rel_path,
-
                             "url": meta.get("original_url", "")
-
                         })
-
             except Exception as e:
-
-                print(f"[Warning] Failed to read metadata in {root}: {e}")
-
-
+                logger.warning(f"Failed to read metadata in {root}: {e}")
 
     records.sort(key=lambda x: x["date"], reverse=True)
-
     
-
-    # HTML 模板
-
-    html_content = f"""<!DOCTYPE html>
-
-<html lang="zh-CN">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>微信文章归档索引</title>
-
-    <style>
-
-        :root {{ --primary-color: #07c160; --text-color: #333; --bg-color: #f5f5f5; }}
-
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }}
-
-        .container {{ max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
-
-        h1 {{ text-align: center; color: var(--primary-color); margin-bottom: 10px; }}
-
-        .stats {{ text-align: center; color: #666; margin-bottom: 30px; font-size: 0.9em; }}
-
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-
-        th {{ background-color: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #eee; }}
-
-        td {{ padding: 12px; border-bottom: 1px solid #eee; }}
-
-        tr:hover {{ background-color: #fcfcfc; }}
-
-        .btn {{ display: inline-block; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85em; transition: 0.2s; }}
-
-        .btn-read {{ background-color: var(--primary-color); color: white; }}
-
-        .btn-read:hover {{ background-color: #06ad56; }}
-
-        .btn-orig {{ color: #666; border: 1px solid #ddd; margin-left: 5px; }}
-
-        .btn-orig:hover {{ background-color: #f0f0f0; }}
-
-        .author {{ color: #888; font-size: 0.9em; }}
-
-        .date {{ font-family: monospace; color: #555; }}
-
-    </style>
-
-</head>
-
-<body>
-
-    <div class="container">
-
-        <h1>微信文章归档索引</h1>
-
-        <div class="stats">共收录 {len(records)} 篇文章 | 最后更新: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
-
-        <table>
-
-            <thead>
-
-                <tr>
-
-                    <th width="120">发布日期</th>
-
-                    <th>文章标题</th>
-
-                    <th width="150">本地阅读</th>
-
-                </tr>
-
-            </thead>
-
-            <tbody>
-
-"""
-
-    for r in records:
-
-        html_content += f"""
-
-                <tr>
-
-                    <td class="date">{r['date']}</td>
-
-                    <td>
-
-                        <div style="font-weight: 500;">{r['title']}</div>
-
-                        <div class="author">{r['author']}</div>
-
-                    </td>
-
-                    <td>
-
-                        <a href="./{quote(r['path'])}" class="btn btn-read">阅读</a>
-
-                        <a href="{r['url']}" target="_blank" class="btn btn-orig">原文</a>
-
-                    </td>
-
-                </tr>"""
-
-
-
-    html_content += """
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</body>
-
-</html>"""
-
-    
-
-    try:
-
-        with open(index_path, "w", encoding="utf-8") as f:
-
-            f.write(html_content)
-
-        print(f"[Index] 全局索引已生成: {index_path}")
-
+    total_records = len(records)
+    if total_records == 0:
+        logger.info("No records found to index.")
         return True
 
-    except Exception as e:
+    # 3. 分页计算
+    total_pages = (total_records + page_size - 1) // page_size
+    logger.info(f"Generating {total_pages} pages for {total_records} records (size={page_size}).")
 
-        print(f"[Error] 索引生成失败: {e}")
+    # 4. 清理旧的分页文件
+    for f in os.listdir(output_root):
+        if f.startswith("index_") and f.endswith(".html"):
+            try:
+                os.remove(os.path.join(output_root, f))
+            except Exception:
+                pass
 
-        return False
+    # 5. 生成页面
+    update_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    for page in range(1, total_pages + 1):
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_records = records[start_idx:end_idx]
+        
+        filename = "index.html" if page == 1 else f"index_{page}.html"
+        file_path = os.path.join(output_root, filename)
+        
+        # 渲染模板
+        try:
+            html_content = template.render(
+                records=page_records,
+                current_page=page,
+                total_pages=total_pages,
+                total_records=total_records,
+                update_time=update_time
+            )
+            
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+                
+        except Exception as e:
+            logger.error(f"Failed to render/write {filename}: {e}")
+            return False
+
+    logger.info(f"全局索引已生成，共 {total_pages} 页")
+    return True

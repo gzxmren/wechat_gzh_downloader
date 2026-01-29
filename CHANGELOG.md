@@ -1,3 +1,17 @@
+## [v4.6.0] - 2026-01-30
+
+### 🏗️ 架构重构 (Architectural Overhaul)
+- **应用化封装 (App Class)**: 将核心逻辑封装为 `WeChatDownloaderApp` 类，实现了 CLI 入口与业务逻辑的彻底解耦，提升了代码的可测试性与维护性。
+- **动态解析器注册 (Dynamic Registry)**: 引入基于装饰器的解析器注册机制。系统支持“自动回退”策略（Robust Parsing），当特异性解析器（如图片频道）误判或失败时，自动降级使用标准解析器，显著提高了抓取成功率。
+- **视图层分离 (Templating)**: 引入 **Jinja2** 模板引擎，将硬编码的 HTML 生成逻辑迁移至 `templates/` 目录，实现了代码与 UI 的分离。
+
+### ✨ 新增功能 (New Features)
+- **配置中心化**: 引入 `core.config.Config` 与 `.env` 支持。用户现在可以通过 `.env` 文件轻松配置 `PAGE_SIZE`, `CONCURRENCY` 等参数。
+- **分页索引**: 全局索引页 (`index.html`) 现在支持分页生成（默认每页 20 条），避免了单页条目过多导致的加载卡顿。
+- **结构化日志**: 全面替换 `print` 为标准化的 `logging` 系统，支持控制台输出与文件日志 (`app.log`) 同步记录，便于故障排查。
+
+---
+
 ## [v4.5] - 2026-01-24
 
 ### 🚀 异步架构升级 (Asynchronous Upgrade)

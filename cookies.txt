@@ -1,0 +1,11 @@
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.qq.com	TRUE	/	FALSE	1800015761	pgv_pvid	872047225
+mp.weixin.qq.com	FALSE	/	TRUE	1777529656	ua_id	8JNoPSlPafDUMEXdAAAAAFsLhQevJVCGuQJ2XM-Du8M=
+.qq.com	TRUE	/	FALSE	1774505657	_clck	h0f3qu|1|fuj|0
+.qq.com	TRUE	/	TRUE	1789609957	yyb_muid	1976F369B4D26F9A2570E672B5466E18
+mp.weixin.qq.com	FALSE	/	TRUE	1771865373	poc_sid	HBj4dGmjrXjwBMTaJeexMtdFgZaB4TsECpbt4mjR
+mp.weixin.qq.com	FALSE	/	FALSE	0	rewardsn	
+mp.weixin.qq.com	FALSE	/	FALSE	0	wxtokenkey	777

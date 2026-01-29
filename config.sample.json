@@ -1,5 +1,6 @@
 {
-    "comment": "请将此文件重命名为 config.json 并填入你的 Cookie。User-Agent 可选，删除则使用默认值。",
+    "comment": "请将此文件重命名为 config.json。支持直接填入 Cookie 字符串，或指定 Netscape 格式的 cookie.txt 文件路径。",
+    "cookie_file": "cookies.txt",
     "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Cookie": "wap_sid2=...; wxsid=...; wxuin=...;"
