@@ -130,6 +130,23 @@ def generate_global_index(output_root):
             except Exception as e:
                 logger.warning(f"Failed to read metadata in {root}: {e}")
 
+    # --- 去重逻辑 (Deduplication) ---
+    seen_urls = set()
+    unique_records = []
+    for r in records:
+        url = r.get("url")
+        # 1. 如果有 URL，基于 URL 去重
+        if url:
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique_records.append(r)
+        # 2. 如果没有 URL (异常数据)，则保留该记录
+        else:
+            unique_records.append(r)
+    
+    records = unique_records
+    # -------------------------------
+
     records.sort(key=lambda x: x["date"], reverse=True)
     
     total_records = len(records)
