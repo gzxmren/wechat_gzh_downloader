@@ -17,6 +17,7 @@ from .html_saver import save_full_html
 from .index_manager import generate_global_index
 from .db_parser import parse_favorite_db
 from .record_manager import RecordManager
+from .triage.manager import TriageManager
 
 class WeChatDownloaderApp:
     def __init__(self, args):
@@ -31,6 +32,7 @@ class WeChatDownloaderApp:
             os.makedirs(output_dir, exist_ok=True)
             
         self.record_manager = RecordManager(csv_path=csv_path)
+        self.triage_manager = TriageManager()
         self.processed_urls: Set[str] = set()
         
     def extract_urls_from_log(self, log_path: str) -> List[str]:
@@ -68,18 +70,26 @@ class WeChatDownloaderApp:
                 # 1. 下载 (内部已有随机延迟)
                 html_content = await download_html(url, session=session)
                 if not html_content:
-                    result.update({"stage": "download", "error": "Download failed"})
+                    # 如果下载函数返回 None，通常意味着触发了验证码或网络错误
+                    # 我们可以尝试从 logger 记录的上下文逻辑中捕获（如果可能）
+                    result.update({"stage": "download", "error": "Download failed (Anti-bot or Network)"})
                     return result
                 
                 # 2. 解析 (支持多解析器)
                 article_data = find_and_parse(html_content, url)
                 if not article_data:
-                    # TODO: Trigger Auto-capture for failed sample here
+                    await self.triage_manager.capture(url, html_content, "NO_PARSER_MATCHED")
                     logger.error(f"解析失败 (所有解析器均无法处理): {url}")
                     result.update({"stage": "parse", "error": "Parsing failed (No parser matched)"})
                     return result
 
-                title = article_data['title']
+                title = article_data.get('title')
+                if not title:
+                    await self.triage_manager.capture(url, html_content, "EMPTY_TITLE")
+                    logger.error(f"解析失败 (标题为空): {url}")
+                    result.update({"stage": "parse", "error": "Parsing failed (Empty title)"})
+                    return result
+
                 author = article_data['author']
                 publish_date = article_data.get('publish_date') or today_str
                 
@@ -146,6 +156,18 @@ class WeChatDownloaderApp:
             except Exception as e:
                 result["error"] = str(e)
                 logger.error(f"处理失败 {url}: {e}")
+                
+                # 针对非网络错误的异常（即下载已成功但在后续阶段出错），保存现场
+                if result.get("stage") != "download":
+                    # 注意：此时 html_content 可能还没定义（如果在下载前就崩了），
+                    # 但在这里我们通常是在下载成功后才可能进入这个 block
+                    # 我们可以安全地尝试捕获
+                    current_html = locals().get('html_content')
+                    if current_html:
+                        await self.triage_manager.capture(
+                            url, current_html, f"EXCEPTION_{result['stage']}", 
+                            exception=e
+                        )
                 
                 # 写入 CSV 失败记录
                 self.record_manager.add_record(

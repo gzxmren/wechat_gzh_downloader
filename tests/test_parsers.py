@@ -1,5 +1,6 @@
 import unittest
 import os
+import json
 from datetime import datetime
 from core.parsers import find_and_parse
 from core.parsers.standard import StandardParser
@@ -12,6 +13,42 @@ class TestParsers(unittest.TestCase):
     def load_fixture(self, filename):
         with open(os.path.join(self.fixtures_dir, filename), 'r', encoding='utf-8') as f:
             return f.read()
+
+    def test_regression_fixtures(self):
+        """
+        [自动闭环] 扫描 fixtures 目录下所有的 .json 文件。
+        如果存在同名的 .html 文件，则自动进行解析回归测试。
+        """
+        has_cases = False
+        for filename in os.listdir(self.fixtures_dir):
+            if filename.endswith(".json"):
+                has_cases = True
+                json_path = os.path.join(self.fixtures_dir, filename)
+                html_path = os.path.join(self.fixtures_dir, filename.replace(".json", ".html"))
+                
+                if not os.path.exists(html_path):
+                    continue
+                
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    truth = json.load(f)
+                
+                with open(html_path, 'r', encoding='utf-8') as f:
+                    html = f.read()
+                
+                print(f"  -> 正在运行回归测试: {filename}")
+                result = find_and_parse(html, truth.get('url', ''))
+                
+                if truth.get('expect_failure'):
+                    self.assertIsNone(result, f"用例 {filename} 预期解析失败(None)，但实际成功了")
+                    continue
+
+                self.assertIsNotNone(result, f"用例 {filename} 解析结果不应为空")
+                self.assertEqual(result['title'], truth['title'], f"标题不匹配: {filename}")
+                self.assertEqual(result['author'], truth['author'], f"作者不匹配: {filename}")
+                self.assertEqual(result['publish_date'], truth['publish_date'], f"日期不匹配: {filename}")
+
+        if not has_cases:
+            print("  (跳过: 没有发现回归测试用例 .json)")
 
     def test_real_world_hybrid_tags(self):
         """测试真实的混合模式文章（包含 hex 转义标签）"""

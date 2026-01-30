@@ -1,6 +1,10 @@
 #output/\n__pycache__/\n*.pyc\n*.log\ndebug_fail.html\n.env
 
+# Output
 output/
+triage_samples/
+
+# Python
 input/
 _pycache_/
 *.pyc

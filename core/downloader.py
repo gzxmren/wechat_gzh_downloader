@@ -69,7 +69,8 @@ async def download_html(url, session=None):
             # Anti-Bot Detection
             if "verify.html" in html or "weui-msg" in html:
                 logger.error(f"访问被拒绝/需要验证。请检查是否需要更新 Cookie。URL: {url}")
-                return None
+                # 不再直接返回 None，而是返回这部分 HTML，让后续的 Triage 逻辑去捕获它
+                return html
                 
             return html
 

@@ -1,3 +1,21 @@
+## [v4.7.0] - 2026-01-30
+
+### 🛡️ 故障分诊系统 (Triage System)
+- **自动样本捕获 (Auto-Capture)**: 当程序遇到解析失败、标题缺失或非预期的异常时，自动将原始 HTML 现场、URL 及详细报错元数据保存至 `triage_samples/` 目录，实现了“故障现场保护”。
+- **人工分诊交互 (The Human Loop)**: 引入 `triage_tool.py review` 指令。该工具支持自动打开浏览器展示失败样本，并通过终端交互式引导用户录入“期望结果”（真理数据），将排错过程简化为问答游戏。
+- **样本去重机制**: 基于 `URL + 失败原因` 的哈希算法，有效防止针对同一故障类型的重复采样，节省存储空间。
+
+### 🧪 自动化回归测试 (Automated Regression)
+- **数据驱动闭环 (Data-Driven Testing)**: 重构了 `tests/test_parsers.py`。测试框架现在能够自动发现 `tests/fixtures/` 目录下所有的 `.json`（真理文件）与 `.html`（样本文件）配对。
+- **预期失败支持 (Expect Failure)**: 引入了 `expect_failure` 字段支持。对于“验证码拦截”、“文章已删除”等已知无法解析的样本，可以通过配置 JSON 实现“负向测试”，确保解析器能准确识别并拦截坏数据，提升系统鲁棒性。
+- **一键用例提升 (Promote)**: `triage_tool.py` 支持将分诊后的样本一键“提升”为正式测试用例，并自动生成 Python 单元测试代码模板。
+
+### 🔧 核心稳定性优化 (Core Stability)
+- **捕获链路增强**: 优化了 `downloader.py` 的拦截逻辑。现在当触发微信反爬（验证码/频率限制）时，下载器会返回提示页面 HTML，允许 Triage 系统捕获这些特殊的“非文章”样本进行离线分析。
+- **错误分类映射**: 细化了失败原因分类，支持 `NO_PARSER_MATCHED`, `EMPTY_TITLE`, `ACCESS_DENIED` 等多种故障类型。
+
+---
+
 ## [v4.6.0] - 2026-01-30
 
 ### 🏗️ 架构重构 (Architectural Overhaul)

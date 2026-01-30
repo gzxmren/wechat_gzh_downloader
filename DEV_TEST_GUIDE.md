@@ -14,7 +14,50 @@
 
 ---
 
-## 2. 可测试性设计 (Design for Testability)
+## 2. 自动化测试与故障分诊 (Triage)
+
+项目引入了 **Triage (故障分诊)** 系统，实现了“发现 Bug -> 捕获样本 -> 人工分诊 -> 自动化回归测试”的完整闭环。
+
+### 2.1 故障捕获逻辑
+当程序在运行过程中遇到以下情况时，会自动将 HTML 现场保存到 `triage_samples/` 目录：
+- 解析器无法匹配 (No Parser Matched)
+- 提取到的标题为空 (Empty Title)
+- 程序运行异常 (Exception during parsing)
+- 触发反爬风控界面 (Anti-bot Detection)
+
+### 2.2 人工分诊交互 (The Human Loop)
+使用 `triage_tool.py` 进行交互式样本处理：
+```bash
+# 进入交互模式
+python3 triage_tool.py review
+```
+**工作流：**
+1. 自动打开浏览器展示失败的 HTML 页面。
+2. 在终端询问你该文章的正确元数据（标题、作者、日期）。
+3. 自动将样本“晋升”为测试用例，存入 `tests/fixtures/`。
+4. 自动生成对应的 `.json` 真理文件（Ground Truth）。
+
+### 2.3 回归测试用例规范 (.json)
+每个 `regression_xxx.html` 对应一个 `regression_xxx.json`，字段含义如下：
+
+| 字段名 | 含义 | 操作建议 |
+| :--- | :--- | :--- |
+| `title` | 预期标题 | 测试会对比解析结果是否一致 |
+| `expect_failure` | 是否预期失败 | **反爬/验证码页面设为 true**，测试将验证结果是否为 None |
+| `reason` | 备注说明 | 记录该样本的特殊性（如：反爬拦截、特殊排版） |
+| `type` | 期望解析器类型 | standard / image_detail / anti_bot |
+| `_comment` | 字段说明 | 仅供人类查看，不参与程序逻辑 |
+
+### 2.4 运行回归测试
+```bash
+# 运行所有解析器测试（包含自动加载的回归用例）
+python3 -m unittest tests/test_parsers.py
+```
+测试框架会自动扫描所有 `.json` 配对文件，并根据其定义的“真理”执行验证。
+
+---
+
+## 3. 可测试性设计 (Design for Testability)
 
 代码好不好测，取决于代码怎么写。
 
@@ -136,3 +179,38 @@ async def test_async_logic(self, mock_fetch):
 5.  **回归测试**: 运行 `python -m unittest discover tests`，确保没改坏别的东西。
 
 遵循此指南，您的代码库将随着功能的增加而变得更加稳固，而不是日益脆弱。
+
+---
+
+## 🛠️ 常用测试与分诊指令
+
+### 单元与集成测试
+```bash
+# 运行所有测试
+python3 -m unittest discover tests
+
+# 运行特定测试文件
+python3 tests/test_parsers.py
+python3 tests/test_app_flow.py
+```
+
+### Triage (故障分诊) 工具
+```bash
+# 查看失败样本列表
+python3 triage_tool.py list
+
+# 交互式人工分诊 (Human Loop)
+python3 triage_tool.py review
+
+# 手动提升样本为测试用例
+python3 triage_tool.py promote [folder_name] -n [custom_name]
+```
+
+### 索引与清单管理
+```bash
+# 手动重建 HTML 索引
+python3 regenerate_index.py
+
+# 手动重建资产清单 (wechat_records.csv)
+python3 export_records.py --rebuild
+```
