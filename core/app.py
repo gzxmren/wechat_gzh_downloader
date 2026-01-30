@@ -15,43 +15,23 @@ from .pdf_generator import generate_pdf
 from .html_saver import save_full_html
 from .index_manager import generate_global_index
 from .db_parser import parse_favorite_db
+from .record_manager import RecordManager
 
 class WeChatDownloaderApp:
     def __init__(self, args):
         self.args = args
-        self.history_file = "history.log"
-        self.error_file = "error.log"
-        self.history_set: Set[str] = set()
         
-    def load_history(self):
-        """加载已成功处理的历史 URL"""
-        if not os.path.exists(self.history_file):
-            return
-        try:
-            with open(self.history_file, "r", encoding="utf-8") as f:
-                self.history_set = set(line.strip() for line in f if line.strip())
-            if not self.args.force:
-                logger.info(f"已加载历史记录，将跳过 {len(self.history_set)} 个链接。")
-        except Exception as e:
-            logger.error(f"加载历史记录失败: {e}")
-
-    def append_history(self, url: str):
-        """记录成功处理的 URL"""
-        try:
-            with open(self.history_file, "a", encoding="utf-8") as f:
-                f.write(f"{url}\n")
-        except Exception as e:
-            logger.error(f"写入历史记录失败: {e}")
-
-    def log_error(self, url: str, reason: str):
-        """记录失败日志"""
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with open(self.error_file, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {url} -> {reason}\n")
-        except Exception as e:
-            logger.error(f"写入错误日志失败: {e}")
-
+        # 确定 CSV 路径：优先使用 args.output，否则使用配置默认值
+        output_dir = args.output if args.output else str(settings.OUTPUT_DIR)
+        csv_path = os.path.join(output_dir, "wechat_records.csv")
+        
+        # 确保目录存在 (RecordManager 需要)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            
+        self.record_manager = RecordManager(csv_path=csv_path)
+        self.processed_urls: Set[str] = set()
+        
     def extract_urls_from_log(self, log_path: str) -> List[str]:
         """从聊天记录文本中提取微信文章链接"""
         urls = []
@@ -140,18 +120,38 @@ class WeChatDownloaderApp:
                         return result
 
                 result["success"] = True
+                
+                # 写入 CSV 成功记录
+                self.record_manager.add_record(
+                    url=url,
+                    status='success',
+                    title=title,
+                    author=author,
+                    published_date=publish_date,
+                    folder_name=os.path.basename(article_dir),
+                    source='downloader'
+                )
+
                 logger.info(f"  -> [OK] {title} 处理完成")
                 return result
             except Exception as e:
                 result["error"] = str(e)
                 logger.error(f"处理失败 {url}: {e}")
+                
+                # 写入 CSV 失败记录
+                self.record_manager.add_record(
+                    url=url,
+                    status='failed',
+                    failure_reason=f"Stage: {result['stage']}, Msg: {str(e)}",
+                    source='downloader'
+                )
                 return result
 
     async def run(self):
         logger.info(f"--- 微信公众号文章下载器 v{settings.VERSION} (Async) ---")
         
-        # 1. 加载历史记录
-        self.load_history()
+        # 1. 获取已处理 URL (RecordManager 在初始化时已自动迁移)
+        self.processed_urls = self.record_manager.processed_urls
         
         # 2. 收集目标 URLs
         all_target_urls = []
@@ -172,7 +172,7 @@ class WeChatDownloaderApp:
 
         # 3. 过滤 URL (先去重并保持顺序)
         unique_all_urls = list(dict.fromkeys(all_target_urls))
-        target_urls = unique_all_urls if self.args.force else [u for u in unique_all_urls if u not in self.history_set]
+        target_urls = unique_all_urls if self.args.force else [u for u in unique_all_urls if u not in self.processed_urls]
         
         if not target_urls:
             logger.info("没有新任务需要处理。")
@@ -196,20 +196,17 @@ class WeChatDownloaderApp:
 
         # 统计与扫尾
         success_count = 0
-        failed_items = []
+        failed_count = 0
         for res in results:
             if res["success"]:
                 success_count += 1
-                self.append_history(res["url"])
             else:
-                logger.error(f"[Error] {res['url']} 失败 ({res['stage']}): {res['error']}")
-                self.log_error(res["url"], f"Stage: {res['stage']}, Msg: {res['error']}")
-                failed_items.append(res["url"])
+                failed_count += 1
 
         logger.info(f"\n--- 处理摘要 ---")
         logger.info(f"任务总数: {len(target_urls)}")
         logger.info(f"成功: {success_count}")
-        logger.info(f"失败: {len(failed_items)}")
+        logger.info(f"失败: {failed_count}")
         
         logger.info("正在更新全局索引...")
         generate_global_index(self.args.output)

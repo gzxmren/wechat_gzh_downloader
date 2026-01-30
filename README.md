@@ -120,7 +120,19 @@ python regenerate_index.py --page-size 50
 *   [x] **v4.3**: 图片频道精准解析逻辑（括号平衡算法）。
 *   [x] **v4.4**: 架构重构（策略模式解析器）。
 *   [x] **v4.5 (Current)**: 异步架构升级，支持全局并发控制 (`--concurrency`) 与图片并行下载。
+*   [ ] **v4.7 (Planned)**: 资产清单管理 (CSV RecordManager)，替代 history.log 实现结构化记录。
 *   [ ] **v5.0 (Planned)**: 多媒体深度支持（视频/语音下载）。
+
+## 🧪 测试 (Testing)
+
+项目配备了完善的自动化测试套件，涵盖了解析器逻辑与核心应用流程。建议在重大改动后运行测试：
+
+```bash
+# 运行全部自动化测试
+python3 -m unittest discover tests
+```
+
+关于测试逻辑的详细说明，请参考 [Refactoring Report v4.6.0](docs/refactoring_v4.6.md#3-测试策略)。
 
 ## 📝 许可证
 MIT License

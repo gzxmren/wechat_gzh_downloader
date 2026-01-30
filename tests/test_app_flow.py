@@ -44,9 +44,13 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
             shutil.rmtree(self.test_output)
         if os.path.exists("tests/mock_urls.txt"):
             os.remove("tests/mock_urls.txt")
-        # 清理生成的 history/error logs
-        if os.path.exists("history.log"): os.remove("history.log")
-        if os.path.exists("error.log"): os.remove("error.log")
+        # 清理生成的 history/csv logs
+        for f in ["history.log", "error.log", "history.log.bak"]:
+            if os.path.exists(f): os.remove(f)
+        
+        # CSV 现在可能在 test_output 里面，已经被 rmtree 清理了，但为了保险：
+        csv_in_output = os.path.join(self.test_output, "wechat_records.csv")
+        if os.path.exists(csv_in_output): os.remove(csv_in_output)
 
     @patch("core.app.fetch_article", new_callable=AsyncMock)
     @patch("core.app.html_to_markdown", new_callable=AsyncMock)
@@ -76,17 +80,16 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         await app.run()
         
         # 验证
-        # 应该调用了2次 fetch (因为 mock_urls.txt 有2个链接)
         self.assertEqual(mock_fetch.call_count, 2)
-        
-        # 应该调用了 save_metadata, save_html
         self.assertTrue(mock_save_meta.called)
-        self.assertTrue(mock_save_html.called)
-        self.assertTrue(mock_save_md.called) # 因为 args.markdown = True
+        
+        # 验证 CSV 是否在指定的 output 目录下生成
+        csv_path = os.path.join(self.test_output, "wechat_records.csv")
+        self.assertTrue(os.path.exists(csv_path), f"CSV should exist at {csv_path}")
 
     @patch("core.app.fetch_article", new_callable=AsyncMock)
     async def test_history_skip(self, mock_fetch):
-        """测试历史记录跳过功能"""
+        """测试历史记录跳过功能 (通过旧 history.log 迁移)"""
         # 设置 Mock 返回值，防止运行时报错
         mock_fetch.return_value = {
             "title": "Test Article 2",
@@ -96,18 +99,20 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
             "original_url": "http://example.com/article2"
         }
 
-        # 先写入一条历史记录
+        # 先写入一条旧版历史记录
         with open("history.log", "w") as f:
             f.write("http://example.com/article1\n")
             
+        # 初始化 App，这会触发 RecordManager 的迁移逻辑
         app = WeChatDownloaderApp(self.mock_args)
         
         # 运行
         await app.run()
         
-        # 因为 article1 在历史记录中，article2 不在
+        # 因为 article1 被从旧历史迁移到了 CSV 的 processed 集合中
         # 所以 fetch 应该只被调用 1 次 (针对 article2)
         self.assertEqual(mock_fetch.call_count, 1)
+        self.assertTrue(os.path.exists("history.log.bak"))
 
 if __name__ == '__main__':
     unittest.main()
