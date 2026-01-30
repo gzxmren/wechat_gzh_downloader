@@ -8,7 +8,8 @@ from typing import List, Set, Optional
 
 from .config import settings
 from .logger import logger
-from .downloader import fetch_article, clean_url
+from .downloader import download_html, clean_url
+from .parsers import find_and_parse
 from .converter import html_to_markdown
 from .file_manager import prepare_article_dir, save_markdown, save_metadata, sanitize_filename
 from .pdf_generator import generate_pdf
@@ -65,22 +66,30 @@ class WeChatDownloaderApp:
             result = {"success": False, "stage": "init", "error": None, "url": url}
             try:
                 # 1. 下载 (内部已有随机延迟)
-                article_data = await fetch_article(url, session=session)
-                if not article_data:
+                html_content = await download_html(url, session=session)
+                if not html_content:
                     result.update({"stage": "download", "error": "Download failed"})
                     return result
-                    
+                
+                # 2. 解析 (支持多解析器)
+                article_data = find_and_parse(html_content, url)
+                if not article_data:
+                    # TODO: Trigger Auto-capture for failed sample here
+                    logger.error(f"解析失败 (所有解析器均无法处理): {url}")
+                    result.update({"stage": "parse", "error": "Parsing failed (No parser matched)"})
+                    return result
+
                 title = article_data['title']
                 author = article_data['author']
                 publish_date = article_data.get('publish_date') or today_str
                 
                 logger.info(f"[Processing] {title}")
                 
-                # 2. 准备目录
+                # 3. 准备目录
                 article_dir, assets_dir = prepare_article_dir(self.args.user, publish_date, title, self.args.output)
                 safe_title = sanitize_filename(title)
                 
-                # 3. 转换 HTML 并本地化图片 (异步并行下载)
+                # 4. 转换 HTML 并本地化图片 (异步并行下载)
                 download_images = not self.args.no_images
                 
                 md_content, processed_html_content = await html_to_markdown(

@@ -3,6 +3,7 @@ import aiohttp
 import aiofiles
 import hashlib
 from urllib.parse import urlparse
+from .logger import logger
 
 def get_image_extension(url, content_type):
     """根据 URL 或 Content-Type 猜测图片扩展名"""
@@ -88,5 +89,5 @@ async def download_image(url, save_dir, session=None):
                 await session.close()
         
     except Exception as e:
-        print(f"[Warning] Image download failed: {url} -> {e}")
+        logger.warning(f"Image download failed: {url} -> {e}")
         return None

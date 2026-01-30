@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta property="og:title" content="漫画：程序员的一天" />
+    <meta name="description" content="这是一个关于程序员日常生活的漫画。" />
+</head>
+<body>
+    <div id="img-content">
+        <h1 class="rich_media_title">漫画：程序员的一天</h1>
+        <span class="rich_media_meta rich_media_meta_nickname">漫画作者</span>
+        <div id="js_content"></div>
+    </div>
+    
+    <script>
+        var ct = "1770000000";
+        // 关键特征：ImageDetailParser 依赖这个数组
+        // 注意：ImageDetailParser 的正则假设 key 没有引号 (cdn_url: "...")
+        var picture_page_info_list = [
+            {
+                cdn_url: "https://example.com/comic_1.jpg",
+                width: 1080,
+                height: 1920
+            },
+            {
+                cdn_url: "https://example.com/comic_2.jpg",
+                width: 1080,
+                height: 1920
+            },
+            {
+                cdn_url: "https://example.com/comic_3.jpg",
+                width: 1080,
+                height: 1920
+            }
+        ];
+    </script>
+</body>
+</html>

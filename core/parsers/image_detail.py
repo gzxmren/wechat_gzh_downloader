@@ -100,12 +100,40 @@ class ImageDetailParser(BaseParser):
         meta_desc_match = re.search(r'<meta\s+name="description"\s+content="([^"]*)"', html, re.IGNORECASE)
         if meta_desc_match:
             raw_desc = meta_desc_match.group(1)
-            desc_text = raw_desc.replace(r'\x0a', '<br/>').replace('\n', '<br/>')
+            # 处理 hex 转义和 HTML 实体
+            desc_text = self.decode_wechat_text(raw_desc)
+            # 统一换行符
+            desc_text = desc_text.replace('\n', '<br/>')
             
-        # 8. 构建 HTML
-        content_html = '<div class="rich_media_content" id="js_content" style="visibility: visible;">'
-        if desc_text:
+        # 8. 尝试提取正文 (混合模式支持)
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "lxml")
+        text_content_html = ""
+        content_div = soup.find(id="js_content")
+        if content_div:
+            # 移除样式中的 hidden/opacity，确保显示
+            if content_div.has_attr("style"):
+                style = content_div["style"]
+                style = style.replace("visibility: hidden", "visibility: visible")
+                style = style.replace("opacity: 0", "opacity: 1")
+                content_div["style"] = style
+            text_content_html = str(content_div)
+
+        # 9. 构建 HTML
+        # 优先显示正文，然后是图片列表（或者反过来，视情况而定，通常正文在前）
+        content_html = '<div class="rich_media_content" id="js_content_wrapper" style="visibility: visible;">'
+        
+        has_body_text = False
+        if content_div:
+            has_body_text = bool(content_div.get_text(strip=True))
+
+        if desc_text and not has_body_text: # 如果有实质正文，通常不需要单独显示 meta description
             content_html += f'<div class="image_channel_desc" style="margin-bottom: 20px; font-size: 16px; line-height: 1.6; color: #333;">{desc_text}</div>'
+            
+        if text_content_html:
+            content_html += text_content_html
+            content_html += "<br/><hr/><br/>" # 分隔符
+
         for cur_url in image_list:
             if '\\x' in cur_url or '\\u' in cur_url:
                 try: cur_url = cur_url.encode('utf-8').decode('unicode_escape')

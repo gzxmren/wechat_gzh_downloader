@@ -2,13 +2,11 @@ import unittest
 from unittest.mock import MagicMock, patch, AsyncMock
 import sys
 import os
-import asyncio
 import shutil
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.app import WeChatDownloaderApp
-from core.config import settings
 
 class TestAppFlow(unittest.IsolatedAsyncioTestCase):
     
@@ -48,20 +46,23 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         for f in ["history.log", "error.log", "history.log.bak"]:
             if os.path.exists(f): os.remove(f)
         
-        # CSV 现在可能在 test_output 里面，已经被 rmtree 清理了，但为了保险：
         csv_in_output = os.path.join(self.test_output, "wechat_records.csv")
         if os.path.exists(csv_in_output): os.remove(csv_in_output)
 
-    @patch("core.app.fetch_article", new_callable=AsyncMock)
+    @patch("core.app.download_html", new_callable=AsyncMock)
+    @patch("core.app.find_and_parse")
     @patch("core.app.html_to_markdown", new_callable=AsyncMock)
     @patch("core.app.save_full_html", new_callable=AsyncMock)
     @patch("core.app.save_metadata", new_callable=AsyncMock)
     @patch("core.app.save_markdown", new_callable=AsyncMock)
-    async def test_run_success(self, mock_save_md, mock_save_meta, mock_save_html, mock_html2md, mock_fetch):
+    async def test_run_success(self, mock_save_md, mock_save_meta, mock_save_html, mock_html2md, mock_parse, mock_download):
         """测试正常的下载流程"""
         
-        # 1. 模拟 fetch_article 返回数据
-        mock_fetch.return_value = {
+        # 1. 模拟 download_html 返回
+        mock_download.return_value = "<html>Mock Content</html>"
+        
+        # 2. 模拟 find_and_parse 返回
+        mock_parse.return_value = {
             "title": "Test Article",
             "author": "Test Author",
             "publish_date": "2023-01-01",
@@ -69,10 +70,10 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
             "original_url": "http://example.com/article1"
         }
         
-        # 2. 模拟 html_to_markdown 返回
+        # 3. 模拟 html_to_markdown 返回
         mock_html2md.return_value = ("# Markdown Content", "<div>Processed HTML</div>")
         
-        # 3. 模拟 save 函数返回 True
+        # 4. 模拟 save 函数返回 True
         mock_save_html.return_value = True
         
         # 运行 App
@@ -80,18 +81,21 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         await app.run()
         
         # 验证
-        self.assertEqual(mock_fetch.call_count, 2)
+        self.assertEqual(mock_download.call_count, 2)
+        self.assertEqual(mock_parse.call_count, 2)
         self.assertTrue(mock_save_meta.called)
         
         # 验证 CSV 是否在指定的 output 目录下生成
         csv_path = os.path.join(self.test_output, "wechat_records.csv")
         self.assertTrue(os.path.exists(csv_path), f"CSV should exist at {csv_path}")
 
-    @patch("core.app.fetch_article", new_callable=AsyncMock)
-    async def test_history_skip(self, mock_fetch):
+    @patch("core.app.download_html", new_callable=AsyncMock)
+    @patch("core.app.find_and_parse")
+    async def test_history_skip(self, mock_parse, mock_download):
         """测试历史记录跳过功能 (通过旧 history.log 迁移)"""
-        # 设置 Mock 返回值，防止运行时报错
-        mock_fetch.return_value = {
+        # 设置 Mock 返回值
+        mock_download.return_value = "<html>Mock Content</html>"
+        mock_parse.return_value = {
             "title": "Test Article 2",
             "author": "Test Author",
             "publish_date": "2023-01-02",
@@ -103,15 +107,14 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         with open("history.log", "w") as f:
             f.write("http://example.com/article1\n")
             
-        # 初始化 App，这会触发 RecordManager 的迁移逻辑
+        # 初始化 App
         app = WeChatDownloaderApp(self.mock_args)
         
         # 运行
         await app.run()
         
-        # 因为 article1 被从旧历史迁移到了 CSV 的 processed 集合中
-        # 所以 fetch 应该只被调用 1 次 (针对 article2)
-        self.assertEqual(mock_fetch.call_count, 1)
+        # 因为 article1 被跳过
+        self.assertEqual(mock_download.call_count, 1)
         self.assertTrue(os.path.exists("history.log.bak"))
 
 if __name__ == '__main__':

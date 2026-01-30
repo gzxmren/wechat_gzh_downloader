@@ -11,16 +11,17 @@ graph TD
     subgraph Core Logic
     App --> Config[Config Manager (.env/config.py)]
     App --> Logger[Structured Logger]
-    App --> Downloader[Async Downloader]
+    App -- Download Only --> Downloader[Async Downloader]
+    App -- Parse Result --> Registry[Parser Registry]
     App --> Converter[Converter]
     App --> Indexer[Index Manager (Jinja2)]
     end
     
     subgraph Parser System
-    Downloader -- Find & Parse --> Registry[Parser Registry]
     Registry -- Can Handle? --> P1[ImageDetailParser]
     Registry -- Can Handle? --> P2[StandardParser]
     Registry -- ... --> P3[Future Parsers]
+    P1 -- Hybrid Mode --> P1_Result[JS Images + HTML Text]
     end
     
     subgraph Output
@@ -32,27 +33,22 @@ graph TD
 ## 2. 核心组件 (Core Components)
 
 ### 2.1 应用控制器 (`core.app.WeChatDownloaderApp`)
-- **职责**: 取代了原先的“上帝脚本”，负责应用程序的生命周期管理。
-- **功能**:
-    - 初始化环境与配置。
-    - 加载历史记录 (`load_history`)。
-    - 调度并发下载任务 (`process_single_url`)。
-    - 统一错误处理与日志记录。
+- **职责**: 应用程序的生命周期管理者与指挥官。
+- **重构**: 现在显式协调 `Downloader` 获取源码与 `Registry` 执行解析，确保了 I/O 与逻辑的清晰分离。
 
 ### 2.2 动态解析器注册表 (`core.parsers.registry`)
 - **设计模式**: 注册表模式 (Registry Pattern) + 责任链 (Chain of Responsibility) 思想。
-- **机制**:
-    - **自动注册**: 使用 `@register_parser` 装饰器，新解析器只需定义即可自动加入系统。
-    - **鲁棒选择 (`find_and_parse`)**: 系统会遍历所有已注册解析器，不仅询问 `can_handle`，还会尝试执行 `parse`。如果首选解析器失败（例如误判），系统会自动回退到下一个可用解析器（如 StandardParser），极大地提高了在大规模抓取时的容错率。
+- **解析器策略**:
+    - **ImageDetailParser (混合解析)**: 针对图片频道。不仅提取 `picture_page_info_list` 里的高清图，还会智能检测并提取 `js_content` 里的传统正文。如果两者并存（混合模式文章），则合并输出，确保信息零丢失。
+    - **StandardParser**: 作为万能回退方案，提取标准的 HTML 正文。
 
 ### 2.3 配置与模板 (`core.config` & `templates/`)
-- **配置中心化**: `Config` 类统一管理环境变量 (`.env`)、JSON 配置与 CLI 参数默认值。
-- **视图分离**: HTML 生成逻辑不再硬编码在 Python 字符串中，而是迁移到了 `templates/` 目录下的 **Jinja2** 模板文件中 (`index.html`, `pagination.html`)，便于前端样式的独立维护。
+- **单一事实来源**: `Config` 类统一管理 `.env`、`config.json` 与 `cookies.txt`。所有配置加载逻辑收敛于此。
+- **视图分离**: HTML 生成基于 Jinja2，便于样式的独立迭代。
 
 ### 2.4 异步并发 (Async Core)
-- **下载**: `aiohttp` + `Semaphore` 控制并发。
+- **下载器 (`core.downloader.download_html`)**: 现在是一个纯粹的异步 HTTP 客户端包装器，专注于高效、安全（防爬）地获取网页源码。
 - **I/O**: `aiofiles` 实现非阻塞文件写入。
-- **图片**: 单篇文章内的图片采用 `asyncio.gather` 并行下载。
 
 ## 3. 关键流程
 

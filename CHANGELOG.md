@@ -2,8 +2,14 @@
 
 ### 🏗️ 架构重构 (Architectural Overhaul)
 - **应用化封装 (App Class)**: 将核心逻辑封装为 `WeChatDownloaderApp` 类，实现了 CLI 入口与业务逻辑的彻底解耦，提升了代码的可测试性与维护性。
+- **模块化解耦 (Downloader vs Parsers)**: 将 `downloader.py` 从解析逻辑中完全解耦。现在下载器仅负责网络 I/O (`download_html`)，而解析逻辑交由 `App` 层显式调度，符合单一职责原则。
 - **动态解析器注册 (Dynamic Registry)**: 引入基于装饰器的解析器注册机制。系统支持“自动回退”策略（Robust Parsing），当特异性解析器（如图片频道）误判或失败时，自动降级使用标准解析器，显著提高了抓取成功率。
 - **视图层分离 (Templating)**: 引入 **Jinja2** 模板引擎，将硬编码的 HTML 生成逻辑迁移至 `templates/` 目录，实现了代码与 UI 的分离。
+
+### 🔧 核心修复与优化 (Core Fixes & Refactoring)
+- **混合解析逻辑 (Hybrid Parser)**: 修复了 `ImageDetailParser` 会导致混合型文章（同时包含正文文本和 JS 图片列表）丢失文字的 Bug。现在的解析器会同时提取 `js_content` 文本和 JS 数组图片，并进行智能合并。
+- **解析器容错增强**: 优化了元数据提取逻辑，支持更多样化的作者标签（从严格的 `<a>` 标签扩展至支持 `<span>` 等任意包含特定 class 的标签）。
+- **自动化测试套件**: 构建了基于 Mock 和 Fixtures 的全套单元测试，涵盖了各种边缘案例（漫画模式、标准模式、风控拦截、404错误等），确保重构过程的逻辑一致性。
 
 ### ✨ 新增功能 (New Features)
 - **配置中心化**: 引入 `core.config.Config` 与 `.env` 支持。用户现在可以通过 `.env` 文件轻松配置 `PAGE_SIZE`, `CONCURRENCY` 等参数。
