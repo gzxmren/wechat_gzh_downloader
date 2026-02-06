@@ -2,84 +2,9 @@ import os
 import datetime
 import json
 from urllib.parse import quote
-
-def init_index_file(index_path):
-    """初始化索引文件头"""
-    if not os.path.exists(index_path):
-        with open(index_path, "w", encoding="utf-8") as f:
-            f.write("# 微信文章归档索引 (WeChat Article Index)\n\n")
-            f.write(f"最后更新: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.write("| 发布日期 | 文章标题 | 作者 | 本地路径 | 原始链接 |\n")
-            f.write("| :--- | :--- | :--- | :--- | :--- |\n")
-
-def update_index(index_path, date_str, title, author, relative_path, url):
-    """
-    追加一条索引记录。
-    
-    Args:
-        index_path (str): index.md 的完整路径
-        date_str (str): 文章发布日期
-        title (str): 文章标题
-        author (str): 公众号名称
-        relative_path (str): Markdown 文件的相对路径 (便于点击)
-        url (str): 原始 URL
-    """
-    # 确保文件存在且有表头
-    if not os.path.exists(index_path):
-        init_index_file(index_path)
-        
-    # 处理标题中的管道符，防止破坏 Markdown 表格
-    safe_title = title.replace("|", "||")
-    safe_author = author.replace("|", "||")
-    
-    # 关键修复：对路径进行 URL 编码 (处理空格和中文)
-    # relative_path 可能是 "output/User_Date/Title.md"
-    # 我们需要将其转换为 URL 安全的格式
-    url_safe_path = quote(relative_path)
-    
-    # 构造相对路径链接 [点击查看](./output/...)
-    local_link = f"[查看本地]({url_safe_path})"
-    
-    # 构造行数据
-    line = f"| {date_str} | {safe_title} | {safe_author} | {local_link} | [原文]({url}) |\n"
-    
-    # 追加模式写入
-    try:
-        with open(index_path, "a", encoding="utf-8") as f:
-            f.write(line)
-    except Exception as e:
-        print(f"[Warning] 更新索引失败: {e}")
-
-import os
-import datetime
-import json
-from urllib.parse import quote
 from jinja2 import Environment, FileSystemLoader
 from .config import settings
 from .logger import logger
-
-def init_index_file(index_path):
-    """
-    Deprecated: Initialization is now handled via template rendering.
-    Kept for backward compatibility if needed by other modules (unlikely).
-    """
-    pass
-
-def update_index(index_path, date_str, title, author, relative_path, url):
-    """
-    追加一条索引记录 (Legacy Mode).
-    注意：在 v4.6+ 分页模式下，该函数仅用于单次追加，并不推荐混用。
-    """
-    # 简单的追加逻辑保留，但不再是核心路径
-    if not os.path.exists(index_path):
-        with open(index_path, "w", encoding="utf-8") as f:
-             f.write(f"| {date_str} | {title} | {author} | [Link]({relative_path}) | [Orig]({url}) |\n")
-    else:
-        try:
-            with open(index_path, "a", encoding="utf-8") as f:
-                f.write(f"| {date_str} | {title} | {author} | [Link]({relative_path}) | [Orig]({url}) |\n")
-        except Exception as e:
-            logger.warning(f"更新索引失败: {e}")
 
 def generate_global_index(output_root):
     """
@@ -120,8 +45,12 @@ def generate_global_index(output_root):
                         rel_dir = os.path.relpath(root, output_root)
                         rel_path = os.path.join(rel_dir, target_file).replace("\\", "/")
                         
+                        # 提取下载时间，若不存在则回退到发布日期
+                        display_date = meta.get("download_time", meta.get("publish_date", "Unknown"))
+                        
                         records.append({
-                            "date": meta.get("publish_date", "Unknown"),
+                            "date": display_date,
+                            "publish_date": meta.get("publish_date", "Unknown"),
                             "title": meta.get("title", "No Title"),
                             "author": meta.get("author", "Unknown"),
                             "path": rel_path,
@@ -147,6 +76,7 @@ def generate_global_index(output_root):
     records = unique_records
     # -------------------------------
 
+    # 按显示日期（现在是下载时间）从新到旧排序
     records.sort(key=lambda x: x["date"], reverse=True)
     
     total_records = len(records)
@@ -166,7 +96,10 @@ def generate_global_index(output_root):
             except Exception:
                 pass
 
-    # 5. 生成页面
+    # 5. 准备全量数据 JSON 字符串 (用于直接嵌入 HTML 绕过 CORS 限制)
+    all_records_json = json.dumps(records, ensure_ascii=False)
+    
+    # 6. 生成页面
     update_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     for page in range(1, total_pages + 1):
@@ -181,6 +114,7 @@ def generate_global_index(output_root):
         try:
             html_content = template.render(
                 records=page_records,
+                all_records_json=all_records_json,  # 注入全量数据
                 current_page=page,
                 total_pages=total_pages,
                 total_records=total_records,
@@ -194,5 +128,14 @@ def generate_global_index(output_root):
             logger.error(f"Failed to render/write {filename}: {e}")
             return False
 
+    # 6. 导出全量数据 JSON (用于前端搜索和排序)
+    json_path = os.path.join(output_root, "all_records.json")
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(records, f, ensure_ascii=False, indent=2)
+        logger.info(f"已导出全量数据到 all_records.json ({total_records} 条记录)")
+    except Exception as e:
+        logger.warning(f"导出 JSON 失败: {e}")
+    
     logger.info(f"全局索引已生成，共 {total_pages} 页")
     return True
