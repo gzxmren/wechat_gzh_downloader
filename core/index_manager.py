@@ -18,6 +18,7 @@ def generate_global_index(output_root):
     env = Environment(loader=FileSystemLoader(str(settings.TEMPLATE_DIR)))
     # 注册 URL 编码过滤器
     env.filters['url_quote'] = quote
+    # test github sync
     
     try:
         template = env.get_template('index.html')
