@@ -85,11 +85,7 @@ def generate_global_index(output_root):
         logger.info("No records found to index.")
         return True
 
-    # 3. 分页计算
-    total_pages = (total_records + page_size - 1) // page_size
-    logger.info(f"Generating {total_pages} pages for {total_records} records (size={page_size}).")
-
-    # 4. 清理旧的分页文件
+    # 3. 清理旧的分页文件 (不再需要，清理一次以防万一)
     for f in os.listdir(output_root):
         if f.startswith("index_") and f.endswith(".html"):
             try:
@@ -97,46 +93,37 @@ def generate_global_index(output_root):
             except Exception:
                 pass
 
-    # 5. 准备全量数据 JSON 字符串 (用于直接嵌入 HTML 绕过 CORS 限制)
+    # 4. 准备全量数据 JSON 字符串
     all_records_json = json.dumps(records, ensure_ascii=False)
     
-    # 6. 生成页面
+    # 5. 生成单页 index.html
     update_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    file_path = os.path.join(output_root, "index.html")
     
-    for page in range(1, total_pages + 1):
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        page_records = records[start_idx:end_idx]
+    try:
+        # 我们不再在该处进行 Python 侧的分页切片，而是将全量数据交给前端
+        # initial_records 可以为空，或者放前20条用于 SEO (视需求而定)，这里简单起见交由 JS 渲染
+        html_content = template.render(
+            all_records_json=all_records_json,
+            total_records=total_records,
+            update_time=update_time,
+            page_size=page_size 
+        )
         
-        filename = "index.html" if page == 1 else f"index_{page}.html"
-        file_path = os.path.join(output_root, filename)
-        
-        # 渲染模板
-        try:
-            html_content = template.render(
-                records=page_records,
-                all_records_json=all_records_json,  # 注入全量数据
-                current_page=page,
-                total_pages=total_pages,
-                total_records=total_records,
-                update_time=update_time
-            )
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
             
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-                
-        except Exception as e:
-            logger.error(f"Failed to render/write {filename}: {e}")
-            return False
+        logger.info(f"全局索引已生成: {file_path} (共 {total_records} 条记录)")
+    except Exception as e:
+        logger.error(f"Failed to render/write index.html: {e}")
+        return False
 
     # 6. 导出全量数据 JSON (用于前端搜索和排序)
     json_path = os.path.join(output_root, "all_records.json")
     try:
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(records, f, ensure_ascii=False, indent=2)
-        logger.info(f"已导出全量数据到 all_records.json ({total_records} 条记录)")
     except Exception as e:
         logger.warning(f"导出 JSON 失败: {e}")
     
-    logger.info(f"全局索引已生成，共 {total_pages} 页")
     return True

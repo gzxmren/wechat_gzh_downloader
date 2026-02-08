@@ -19,6 +19,10 @@
 *   **断点续传**: 自动记录处理成功的 URL (`history.log`)，支持中断后继续运行。
 *   **异步并发 (New)**: 基于 `asyncio` 的异步架构，支持多任务并行抓取和图片并行下载，显著提升处理效率。
 *   **智能重试**: 内置失败重试机制，并记录错误日志 (`error.log`)。
+*   **交互式体验 (New)**:
+    *   **智能参数**: 自动识别文件路径或 URL，无需 `-i` 参数。
+    *   **交互模式**: 直接运行程序可进入交互模式，支持粘贴复杂 URL（无需引号），解决命令行特殊字符转义痛点。
+    *   **SPA 索引**: 重构后的 `index.html` 采用单页应用架构，支持即时搜索、排序和客户端分页。
 
 ## 🚀 快速开始
 
@@ -50,6 +54,27 @@ sudo apt install wkhtmltopdf
 ### 3. 模式 B：从数据库解密
 ```bash
 python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
+```
+
+### 4. 模式 C：智能参数与交互模式 (New)
+
+#### 交互模式 (解决 URL 引号问题)
+直接运行程序，粘贴包含 `&` 等特殊字符的 URL（无需加引号）：
+```bash
+python get_wx_gzh.py
+# 程序提示: 请输入文章 URL (回车确认): <在此粘贴>
+```
+
+#### 智能文件读取
+直接传入文件路径，自动识别为批量模式：
+```bash
+python get_wx_gzh.py input/urls.txt
+```
+
+#### 智能单篇下载
+直接传入 URL，自动识别为单篇模式：
+```bash
+python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 ```
 
 ## ⚙️ 基础配置 (Basic Config)

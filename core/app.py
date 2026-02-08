@@ -187,8 +187,19 @@ class WeChatDownloaderApp:
         # 2. 收集目标 URLs
         all_target_urls = []
         if self.args.url:
-            all_target_urls = [self.args.url]
-            logger.info(f"模式: 单 URL 处理 -> {self.args.url}")
+            if os.path.isfile(self.args.url):
+                logger.info(f"模式: 文件导入 -> {self.args.url}")
+                try:
+                    with open(self.args.url, "r", encoding="utf-8") as f:
+                        for line in f:
+                            stripped = line.strip()
+                            if stripped and not stripped.startswith("#"):
+                                all_target_urls.append(stripped)
+                except Exception as e:
+                    logger.error(f"读取文件失败: {e}")
+            else:
+                all_target_urls = [self.args.url]
+                logger.info(f"模式: 单 URL 处理 -> {self.args.url}")
         elif self.args.db:
             all_target_urls = [a['url'] for a in parse_favorite_db(self.args.decrypted_db)]
         elif self.args.chat_log:
@@ -200,6 +211,20 @@ class WeChatDownloaderApp:
                         stripped = line.strip()
                         if stripped and not stripped.startswith("#"):
                             all_target_urls.append(stripped)
+            
+            # 交互模式：如果未通过参数或文件提供任何 URL，则提示用户输入
+            if not all_target_urls:
+                print("\n" + "="*50)
+                print("提示: 未检测到输入任务。")
+                print("Tip: 若 URL 包含 '&' 等特殊字符，请在此处直接粘贴 (无需引号)。")
+                print("="*50)
+                try:
+                    # 使用 input 阻塞式获取输入，此时尚未开始异步任务
+                    raw_input = input("请输入文章 URL (回车确认): ").strip()
+                    if raw_input:
+                        all_target_urls.append(raw_input)
+                except (EOFError, KeyboardInterrupt):
+                    pass
 
         # 3. 过滤 URL (先去重并保持顺序)
         unique_all_urls = list(dict.fromkeys(all_target_urls))

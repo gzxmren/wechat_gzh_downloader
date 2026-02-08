@@ -26,17 +26,23 @@
 #### 🚀 基本运行方式
 
 ```bash
-# 最简单的用法（从默认 urls.txt 读取）
+# 1. 交互式模式 (New) - 推荐用于复杂 URL
+# 直接运行，程序会提示粘贴 URL（无需加引号）
 python get_wx_gzh.py
 
-# 从聊天记录导出文件下载（推荐）
+# 2. 智能文件读取 (New)
+# 直接传入文件路径，自动识别为批量模式
+python get_wx_gzh.py input/urls.txt
+
+# 3. 智能单篇下载 (New)
+# 直接传入 URL，自动识别为单篇模式
+python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
+
+# 4. 从聊天记录导出文件下载（推荐）
 python get_wx_gzh.py --chat-log input/messages.txt
 
-# 从指定 URL 文件下载
+# 5. (传统方式) 显式指定输入文件
 python get_wx_gzh.py -i input/urls.txt
-
-# 直接下载单个 URL
-python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 ```
 
 #### 📋 完整参数列表
@@ -45,8 +51,8 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 
 | 参数 | 类型 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
-| `url` | 位置参数 | - | 直接指定单个 URL（可选） | `python get_wx_gzh.py https://mp.weixin.qq.com/s/xxx` |
-| `-i, --input` | 文件路径 | `input/urls.txt` | 输入 URL 文件路径 | `-i input/my_urls.txt` |
+| `url` | 位置参数 | - | **智能参数**: 可是单个 URL 或 URL 文件路径 | `python get_wx_gzh.py input/urls.txt` |
+| `-i, --input` | 文件路径 | `input/urls.txt` | (传统) 输入 URL 文件路径 | `-i input/my_urls.txt` |
 | `-o, --output` | 目录路径 | `output` | 输出目录路径 | `-o /path/to/output` |
 | `-u, --user` | 字符串 | `MyWeChatUser` | 微信用户名前缀 | `-u MyAccount` |
 
@@ -217,10 +223,8 @@ output/
 │   ├── 文章标题_2026-02-07.pdf       # PDF 文件（可选）
 │   ├── metadata.json                  # 文章元数据
 │   └── assets/                        # 本地化的图片
-│       ├── image_001.jpg
-│       └── image_002.png
-├── index.html                         # 全局索引页
-└── index_page_*.html                  # 分页索引页
+├── index.html                         # 全局索引页 (SPA单页应用)
+├── all_records.json                   # 索引数据源
 ```
 
 ---
@@ -299,10 +303,8 @@ python regenerate_index.py
 
 ```
 output/
-├── index.html              # 主索引页（第 1 页）
-├── index_page_2.html       # 第 2 页
-├── index_page_3.html       # 第 3 页
-└── ...
+├── index.html              # 全局 SPA 索引页 (包含所有记录)
+├── all_records.json        # 索引数据源 (JSON)
 ```
 
 ---

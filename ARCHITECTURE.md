@@ -59,10 +59,10 @@ graph TD
 4. **Fallback**: 如果失败，回退到 `StandardParser`。
 5. **Return**: 返回统一的元数据字典。
 
-### 3.2 索引生成
+### 3.2 索引生成 (SPA Architecture)
 1. **Scan**: 扫描 `output/` 目录下的 `metadata.json`。
-2. **Paginate**: 根据 `.env` 中的 `PAGE_SIZE` 进行分页。
-3. **Render**: 使用 Jinja2 渲染 HTML 页面，包含导航栏。
+2. **Generate**: 将元数据序列化为 JSON。
+3. **Render**: 使用 Jinja2 生成单页 `index.html`，通过内嵌 JSON 数据实现纯前端的搜索、排序与分页 (CSR)。
 
 ## 4. 下一步计划 (Roadmap)
 *   [ ] **Phase 3: 多媒体支持**: 基于新的解析器架构，轻松扩展视频和音频下载功能。

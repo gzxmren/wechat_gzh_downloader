@@ -114,8 +114,7 @@ wechat_gzh_downloader/
 
 | 文件名 | 用途 |
 |--------|------|
-| `index.html` | **全局索引页模板** - 展示所有下载文章的列表，支持搜索、排序、分页 |
-| `pagination.html` | **分页组件模板** - 可复用的分页导航组件 |
+| `index.html` | **全局索引页模板** - SPA 单页应用模板，包含前端搜索、排序、分页逻辑 |
 
 **特点**: 采用现代化设计，支持响应式布局、暗色模式、搜索过滤等功能。
 
@@ -169,8 +168,8 @@ output/
 │       ├── image_001.jpg
 │       ├── image_002.png
 │       └── ...
-├── index.html                      # 全局索引页
-└── index_page_*.html               # 分页索引页
+├── index.html                      # 全局索引页 (SPA)
+└── all_records.json                # 索引数据源 (JSON)
 ```
 
 **注意**: 此目录中的结果文件和子目录不需要在本文档中逐一解释（按用户要求）。
@@ -265,8 +264,8 @@ python regenerate_index.py -o /path/to/output
 
 **工作原理**:
 1. 扫描输出目录下的所有 `metadata.json` 文件
-2. 根据 `.env` 中的 `PAGE_SIZE` 进行分页
-3. 使用 Jinja2 模板渲染 HTML 页面
+2. 生成全量数据 `all_records.json`
+3. 使用 Jinja2 渲染单页 `index.html`，内嵌 JSON 数据供前端分页
 
 ---
 
