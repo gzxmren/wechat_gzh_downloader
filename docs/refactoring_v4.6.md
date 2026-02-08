@@ -80,4 +80,4 @@ python3 -m unittest discover tests
 - **E (Error)**: 代码崩溃，通常由语法错误、路径不存在或 Mock 配置不当引起。
 
 ## 4. 未来展望
-当前的架构为 Phase 3（引入 SQLite）奠定了坚实基础。App 类可以轻松替换 `load_history` 方法以从数据库读取，而无需修改下载核心。
+当前的架构为 Phase 3（多媒体支持）奠定了坚实基础。App 类可以轻松扩展解析器以支持视频和音频下载功能。
