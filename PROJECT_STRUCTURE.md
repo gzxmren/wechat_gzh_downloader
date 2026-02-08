@@ -47,9 +47,10 @@ wechat_gzh_downloader/
 | `image_handler.py` | **图片处理器** | 异步下载图片并本地化链接 |
 | `file_manager.py` | **文件管理器** | 文件路径处理、目录创建等文件系统操作 |
 | `index_manager.py` | **索引管理器** | 基于 Jinja2 生成全局 HTML 索引页面 |
-| `record_manager.py` | **记录管理器** | 管理 `wechat_records.csv` 资产清单 |
+| `record_manager.py` | **记录管理器** | 异步管理 `wechat_records.csv` 资产清单 |
 | `db_parser.py` | **数据库解析器** | 解析微信 `Favorite.db` 数据库 |
-| `db_decrypter.py` | **数据库解密器** | 解密加密的微信数据库文件 |
+| `db_decrypter.py` | **数据库解密器** | 安全地解密加密的微信数据库文件 |
+| `utils.py` | **工具类** | 提供系统命令检查等通用辅助功能 |
 | `logger.py` | **日志记录器** | 结构化日志输出配置 |
 
 #### 子目录

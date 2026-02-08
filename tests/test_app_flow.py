@@ -25,6 +25,7 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         self.mock_args.url = None
         self.mock_args.input = "tests/mock_urls.txt"
         self.mock_args.force = False
+        self.mock_args.retry = 1
         self.mock_args.markdown = True
         self.mock_args.pdf = False
         self.mock_args.no_images = True
@@ -88,6 +89,12 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         # 验证 CSV 是否在指定的 output 目录下生成
         csv_path = os.path.join(self.test_output, "wechat_records.csv")
         self.assertTrue(os.path.exists(csv_path), f"CSV should exist at {csv_path}")
+        
+        # 验证内容写入是否成功 (Async Write Check)
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
+            content = f.read()
+            self.assertIn("http://example.com/article1", content)
+            self.assertIn("success", content)
 
     @patch("core.app.download_html", new_callable=AsyncMock)
     @patch("core.app.find_and_parse")

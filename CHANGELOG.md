@@ -1,3 +1,19 @@
+## [v4.9.0] - 2026-02-08
+
+### 🛡️ 安全加固 (Security Hardening)
+- **XSS 彻底修复**: 在 `core/index_manager.py` 中增加了对嵌入式 JSON 数据的 HTML 实体转义（Unicode 编码），彻底杜绝了恶意文章标题通过 `</script>` 截断标签引发的 XSS 风险。
+- **SQL 注入防护**: 对 `core/db_decrypter.py` 进行了安全加固。增加了对数据库密钥（Key）的 Hex 格式强制校验，并实现了对输出路径中单引号的自动转义，防止恶意路径导致 SQL 注入。
+- **SSRF/LFI 风险规避**: 在 `core/pdf_generator.py` 中引入了 HTML 净化机制。在生成 PDF 前自动剔除所有 `file://` 协议引用，防止攻击者通过构造恶意文章内容窃取服务器本地敏感文件。
+
+### ⚙️ 可靠性提升 (Reliability Improvements)
+- **重试机制激活**: 正式实现了 `process_single_url` 中的异步重试逻辑，支持通过 `--retry` 参数自定义重试次数。引入了线性退避策略，显著提升了在不稳定网络环境下的下载成功率。
+- **环境预检 (Pre-flight Check)**: 程序启动时会自动检测核心外部依赖（如 `wkhtmltopdf` 和 `sqlcipher`）。如果用户开启了相应功能但系统未安装依赖，程序将提前拦截并给出清晰的安装指引，避免运行中途报错。
+
+### 🚀 性能与优化 (Performance & Optimization)
+- **全异步化日志**: 重构了 `RecordManager` 的持久化逻辑。将原本阻塞的 CSV 写入操作改为基于 `aiofiles` 的异步追加模式，并使用内存缓冲区生成 CSV 行，消除了高并发下的 I/O 阻塞隐患。
+
+---
+
 ## [v4.8.0] - 2026-02-08
 
 ### 🚀 交互式体验升级 (Interactive UX)

@@ -1,6 +1,9 @@
 import os
 import csv
 import datetime
+import io
+import aiofiles
+import asyncio
 from pathlib import Path
 from typing import List, Set, Dict, Optional
 from .logger import logger
@@ -67,11 +70,11 @@ class RecordManager:
             
         return self.processed_urls
 
-    def add_record(self, url: str, status: str = 'success', title: str = '', 
+    async def add_record(self, url: str, status: str = 'success', title: str = '', 
                    author: str = '', published_date: str = '', folder_name: str = '', 
                    failure_reason: str = '', source: str = 'downloader'):
         """
-        向 CSV 追加一条记录。
+        异步向 CSV 追加一条记录 (非阻塞)。
         """
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -92,19 +95,30 @@ class RecordManager:
         }
         
         try:
-            # 使用追加模式
-            file_exists = os.path.isfile(self.csv_path)
-            with open(self.csv_path, 'a', encoding='utf-8-sig', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=self.HEADERS)
-                if not file_exists:
-                    writer.writeheader()
-                writer.writerow(record)
+            # 使用内存缓冲生成 CSV 行字符串
+            buffer = io.StringIO()
+            writer = csv.DictWriter(buffer, fieldnames=self.HEADERS)
+            
+            # 如果文件不存在，理论上需要写表头，但这里是 append 模式且 init 保证了文件存在
+            # 为了安全，如果文件真的被删了，aiofiles append 会创建新文件，此时缺表头
+            # 但检测文件存在性是同步 IO，为了性能我们假设 _init_csv 已处理好
+            # 或者我们可以简单判断一下:
+            # if not os.path.exists(self.csv_path): ... (blocking)
+            # 暂时忽略极端情况，直接写记录
+            writer.writerow(record)
+            csv_line = buffer.getvalue()
+            
+            # 异步写入文件
+            async with aiofiles.open(self.csv_path, 'a', encoding='utf-8-sig') as f:
+                await f.write(csv_line)
+                
         except Exception as e:
             logger.error(f"追加 CSV 记录失败: {e}")
 
     def _migrate_legacy_history(self):
         """
         从旧的 history.log 自动迁移数据到 CSV。
+        为了兼容性，内部调用同步逻辑，但在初始化阶段运行是可以的。
         """
         if not os.path.exists(self.history_file):
             return
@@ -126,29 +140,39 @@ class RecordManager:
         existing_urls = self.load_existing_urls()
         
         migrated_count = 0
-        for url in legacy_urls:
-            if url not in existing_urls:
-                # 补录到 CSV
-                self.add_record(
-                    url=url, 
-                    status='success', 
-                    title='[Migrated]', 
-                    source='history_migration'
-                )
-                migrated_count += 1
         
-        if migrated_count > 0:
-            logger.info(f"成功迁移 {migrated_count} 条记录到 CSV。")
-        
-        # 归档旧文件
+        # 批量迁移使用同步写入以简化逻辑（因为只在启动时运行一次）
+        # 这里复用手动写入逻辑而不是 call async add_record，因为我们在 __init__ 中不能 await
         try:
+            with open(self.csv_path, 'a', encoding='utf-8-sig', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=self.HEADERS)
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                for url in legacy_urls:
+                    if url not in existing_urls:
+                        writer.writerow({
+                            'url': url,
+                            'status': 'success',
+                            'title': '[Migrated]', 
+                            'author': '', 'published_date': '', 'folder_name': '',
+                            'timestamp': timestamp, 'failure_reason': '',
+                            'source': 'history_migration'
+                        })
+                        self.processed_urls.add(url)
+                        migrated_count += 1
+                        
+            if migrated_count > 0:
+                logger.info(f"成功迁移 {migrated_count} 条记录到 CSV。")
+            
+            # 归档旧文件
             backup_name = f"{self.history_file}.bak"
             if os.path.exists(backup_name):
-                os.remove(backup_name) # 移除旧的备份
+                os.remove(backup_name) 
             os.rename(self.history_file, backup_name)
             logger.info(f"旧历史文件已更名为 {backup_name}")
+            
         except Exception as e:
-            logger.error(f"归档旧文件失败: {e}")
+            logger.error(f"迁移数据失败: {e}")
 
     def rebuild_from_folder(self, output_dir: str):
         """

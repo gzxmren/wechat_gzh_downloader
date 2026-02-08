@@ -1,6 +1,7 @@
 import pdfkit
 import os
 import asyncio
+import re
 
 # PDF 生成是进程密集型任务，限制并发数以保护 CPU
 PDF_SEMAPHORE = asyncio.Semaphore(2)
@@ -17,6 +18,11 @@ def _generate_pdf_sync(html_content, title, output_path, assets_dir):
     """
     同步生成 PDF 的逻辑，被包装在 generate_pdf 中。
     """
+    # 0. 安全清洗：移除所有 file:// 协议的引用，防止 SSRF/LFI
+    # 正常的 assets 引用是相对路径 "assets/..."，不会触发此规则
+    if html_content:
+        html_content = re.sub(r'(src|href)\s*=\s*["\']file://[^"\']*["\']', '', html_content, flags=re.IGNORECASE)
+
     # 1. 构造完整的 HTML 文档
     full_html = f"""
     <!DOCTYPE html>

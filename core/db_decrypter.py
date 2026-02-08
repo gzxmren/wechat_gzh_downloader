@@ -4,12 +4,21 @@ import shutil
 
 def run_sqlcipher_cmd(encrypted_db, key, output_db, config_sql):
     """辅助函数：执行一次 sqlcipher 命令"""
+    # 1. 安全校验: Key 必须是 64 位 Hex 字符
+    if not key or len(key) != 64 or not all(c in '0123456789abcdefABCDEF' for c in key):
+        print(f"[Error] Invalid Key format. Expected 64-char hex string.")
+        return False
+
+    # 2. 安全转义: 路径中的单引号需要转义为 '' 以防止 SQL 注入
+    # 虽然是本地工具，但防御性编程是必要的
+    safe_output_db = output_db.replace("'", "''")
+
     # 构造完整的 SQL 脚本
     full_sql = f"""
     PRAGMA key = "x'{key}'";
     PRAGMA cipher_page_size = 4096;
     {config_sql}
-    ATTACH DATABASE '{output_db}' AS plaintext KEY '';
+    ATTACH DATABASE '{safe_output_db}' AS plaintext KEY '';
     SELECT sqlcipher_export('plaintext');
     DETACH DATABASE plaintext;
     """

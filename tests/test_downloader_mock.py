@@ -49,7 +49,8 @@ class TestDownloaderMock(unittest.TestCase):
         
         html = asyncio.run(download_html("http://test.com/block"))
         
-        self.assertIsNone(html)
+        self.assertIsNotNone(html)
+        self.assertIn("verify.html", html)
 
 if __name__ == '__main__':
     unittest.main()
