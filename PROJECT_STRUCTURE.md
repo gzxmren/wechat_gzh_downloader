@@ -18,6 +18,7 @@ wechat_gzh_downloader/
 ├── output/                  # 输出结果目录
 ├── triage_samples/          # 故障样本存储目录
 ├── get_wx_gzh.py           # 主程序入口
+├── wechat_db_tool.py       # 数据库提取工具 (New)
 ├── regenerate_index.py     # 索引重建工具
 ├── triage_tool.py          # 故障分诊工具
 ├── clean_messages.py       # 聊天记录清洗工具
@@ -239,6 +240,35 @@ python get_wx_gzh.py -i input/urls.txt --concurrency 5
 ---
 
 ### 2.2 辅助工具程序
+
+#### `wechat_db_tool.py` - 数据库提取工具 (New)
+
+**程序类型**: 数据库处理工具
+
+**功能**: 专门用于处理微信本地数据库 (`Favorite.db`)，支持解密并提取文章链接。
+
+**使用场景**:
+- 需要从微信电脑版数据库批量导入文章时
+- 数据库已加密，需要使用密钥解密
+
+**使用示例**:
+```bash
+# 1. 解密并提取 (标准流程)
+python wechat_db_tool.py --db-path input/Favorite.db --key "YOUR_KEY" -o input/db_urls.txt
+
+# 2. 从已解密数据库提取
+python wechat_db_tool.py --decrypted-db input/decrypted.db -o input/db_urls.txt
+```
+
+**关键参数**:
+| 参数 | 说明 |
+|------|------|
+| `-o, --output` | 导出 URL 的目标文件路径 (必需) |
+| `--db-path` | 加密的 Favorite.db 路径 |
+| `--key` | 64位 Hex 密钥 (配合 --db-path) |
+| `--decrypted-db` | 直接指定已解密的数据库路径 |
+
+---
 
 #### `regenerate_index.py` - 索引重建工具
 

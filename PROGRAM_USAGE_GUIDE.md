@@ -2,7 +2,7 @@
 
 > **文档目的**: 详细说明所有可执行程序、测试程序、检测调试工具的运行方式、参数配置和使用目的。
 > 
-> **最后更新**: 2026-02-07
+> **最后更新**: 2026-02-09 (v5.0.0)
 
 ---
 
@@ -69,7 +69,6 @@ python get_wx_gzh.py -i input/urls.txt
 | 参数 | 类型 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
 | `--chat-log` | 文件路径 | - | 指定导出的聊天记录文件（txt 格式） | `--chat-log input/messages.txt` |
-| `--db` | 开关 | `False` | 启用数据库读取模式 | `--db` |
 
 ##### 输出格式参数
 
@@ -87,14 +86,6 @@ python get_wx_gzh.py -i input/urls.txt
 |------|------|--------|------|------|
 | `--retry` | 整数 | `1` | 单次运行的失败重试次数 | `--retry 3` |
 | `--force` | 开关 | `False` | 强制处理所有 URL（忽略历史记录） | `--force` |
-
-##### 数据库模式专用参数
-
-| 参数 | 类型 | 默认值 | 说明 | 示例 |
-|------|------|--------|------|------|
-| `--key` | 字符串 | - | 微信数据库密钥（64 字符） | `--key "your_64_char_key"` |
-| `--db-path` | 文件路径 | - | 加密的 Favorite.db 路径 | `--db-path input/Favorite.db` |
-| `--decrypted-db` | 文件路径 | - | 直接指定已解密的数据库路径 | `--decrypted-db input/decrypted.db` |
 
 #### 💼 使用场景与示例
 
@@ -121,31 +112,17 @@ python get_wx_gzh.py --chat-log input/messages.txt --markdown --pdf
 python get_wx_gzh.py
 
 # 从自定义文件下载
-python get_wx_gzh.py -i input/my_articles.txt --markdown
+python get_wx_gzh.py input/my_articles.txt --markdown
 
 # 设置并发数为 5
-python get_wx_gzh.py -i input/urls.txt --concurrency 5
+python get_wx_gzh.py input/urls.txt --concurrency 5
 ```
 
 **目的**: 适合已有 URL 列表的情况。
 
 ---
 
-##### 场景 3: 从数据库读取
-
-```bash
-# 使用密钥解密并读取
-python get_wx_gzh.py --db --key "your_64_char_key" --db-path input/Favorite.db
-
-# 直接使用已解密的数据库
-python get_wx_gzh.py --db --decrypted-db input/decrypted.db --markdown --pdf
-```
-
-**目的**: 直接从微信收藏夹数据库提取文章。
-
----
-
-##### 场景 4: 下载单篇文章
+##### 场景 3: 下载单篇文章
 
 ```bash
 # 直接指定 URL
@@ -156,28 +133,17 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx --markdown --pdf
 
 ---
 
-##### 场景 5: 强制重新下载
+##### 场景 4: 强制重新下载
 
 ```bash
 # 忽略历史记录，强制重新处理所有 URL
-python get_wx_gzh.py -i input/urls.txt --force
+python get_wx_gzh.py input/urls.txt --force
 
 # 重新下载并重试 3 次
-python get_wx_gzh.py -i input/urls.txt --force --retry 3
+python get_wx_gzh.py input/urls.txt --force --retry 3
 ```
 
 **目的**: 重新下载已处理过的文章，或修复之前失败的下载。
-
----
-
-##### 场景 6: 仅下载文本（不下载图片）
-
-```bash
-# 禁用图片下载，加快速度
-python get_wx_gzh.py -i input/urls.txt --no-images --markdown
-```
-
-**目的**: 仅保存文本内容，节省时间和存储空间。
 
 ---
 
@@ -231,7 +197,35 @@ output/
 
 ## 2. 辅助工具程序
 
-### 2.1 `regenerate_index.py` - 索引重建工具
+### 2.1 `wechat_db_tool.py` - 数据库提取工具
+
+#### 📌 程序目的
+专门用于处理微信本地数据库 (`Favorite.db`)，支持解密并提取文章链接，作为下载的前置步骤。
+
+#### 🚀 运行方式
+
+```bash
+# 1. 解密并提取 (Standard)
+python wechat_db_tool.py --db-path input/Favorite.db --key "YOUR_KEY" -o input/db_urls.txt
+
+# 2. 从已解密数据库提取
+python wechat_db_tool.py --decrypted-db input/decrypted.db -o input/db_urls.txt
+```
+
+#### 📋 参数列表
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `-o, --output` | 路径 (必需) | 导出 URL 的目标文件 | `-o input/db_urls.txt` |
+| `--db-path` | 路径 | 加密的 Favorite.db 路径 | `--db-path input/Favorite.db` |
+| `--key` | 字符串 | 64位 Hex 密钥 (配合 --db-path) | `--key "abcdef..."` |
+| `--decrypted-db` | 路径 | 直接指定已解密的数据库 | `--decrypted-db out.db` |
+
+**依赖**: 运行解密模式需要系统安装 `sqlcipher`。
+
+---
+
+### 2.2 `regenerate_index.py` - 索引重建工具
 
 #### 📌 程序目的
 扫描 `output/` 目录下的所有文章，重新生成全局 HTML 索引页面（`index.html`）。

@@ -15,7 +15,6 @@ from .file_manager import prepare_article_dir, save_markdown, save_metadata, san
 from .pdf_generator import generate_pdf
 from .html_saver import save_full_html
 from .index_manager import generate_global_index
-from .db_parser import parse_favorite_db
 from .record_manager import RecordManager
 from .triage.manager import TriageManager
 from .utils import check_command_exists
@@ -43,16 +42,6 @@ class WeChatDownloaderApp:
             if not check_command_exists("wkhtmltopdf"):
                 logger.error("未找到 'wkhtmltopdf' 命令。请先安装它（如：sudo apt install wkhtmltopdf）或禁用 PDF 生成。")
                 return False
-        
-        # 2. 检查数据库解密依赖
-        if self.args.db:
-            # 注意：只有在没有提供 decrypted_db 且需要执行解密时才强制检查
-            # 目前逻辑建议不论如何都检查一下，因为用户选了 --db 模式通常意味着有解密需求
-            if not check_command_exists("sqlcipher"):
-                 # 如果提供了已解密的数据库，可以放行
-                if not self.args.decrypted_db:
-                    logger.error("未找到 'sqlcipher' 命令。数据库解密模式需要此依赖。")
-                    return False
         
         return True
 
@@ -233,8 +222,6 @@ class WeChatDownloaderApp:
             else:
                 all_target_urls = [self.args.url]
                 logger.info(f"模式: 单 URL 处理 -> {self.args.url}")
-        elif self.args.db:
-            all_target_urls = [a['url'] for a in parse_favorite_db(self.args.decrypted_db)]
         elif self.args.chat_log:
             all_target_urls = self.extract_urls_from_log(self.args.chat_log)
         else:

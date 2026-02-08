@@ -6,7 +6,7 @@
 
 *   **多模式导入**: 
     *   **聊天记录模式 (推荐)**: 自动提取“文件传输助手”导出文本中的链接。
-    *   **数据库模式**: 自动解密并读取微信 `Favorite.db`。
+    *   **数据库模式 (通过辅助工具)**: 自动解密并读取微信 `Favorite.db`。
     *   **文本模式**: 支持从 `urls.txt` 批量读取。
 *   **多格式导出**: 
     *   **默认 HTML**: 默认生成包含所有样式和本地化资源的独立 HTML 文件。
@@ -20,7 +20,6 @@
 *   **异步并发 (New)**: 基于 `asyncio` 的异步架构，支持多任务并行抓取和图片并行下载，显著提升处理效率。
 *   **异步重试 (New)**: 完善的重试机制与线性退避策略，大幅提升弱网环境下的任务成功率。
 *   **环境预检 (New)**: 启动时自动检测 `wkhtmltopdf` 等核心依赖，提供友好的错误提示。
-*   **智能重试**: 内置失败重试机制，并记录错误日志 (`error.log`)。
 *   **交互式体验 (New)**:
     *   **智能参数**: 自动识别文件路径或 URL，无需 `-i` 参数。
     *   **交互模式**: 直接运行程序可进入交互模式，支持粘贴复杂 URL（无需引号），解决命令行特殊字符转义痛点。
@@ -36,26 +35,31 @@
 pip install -r requirements.txt
 
 # (可选，用于 PDF 输出) 导出 PDF 依赖 wkhtmltopdf
-# 注意：默认安装的 wkhtmltopdf 可能不支持高级特性（如页码和目录）。
-# 如果遇到问题，可尝试安装特定版本或接受程序自动降级为普通 PDF。
 sudo apt install wkhtmltopdf
 ```
 
 ### 2. 模式 A：从聊天记录导出 (最简单)
 1. 在 PC 微信收藏夹全选文章 -> 转发给“文件传输助手”。
 2. 使用工具（如留痕/MemoTrace）导出与文件传输助手的聊天记录为 `messages.txt`。
-3. 运行下载（默认生成 HTML）：
+3. 运行下载：
    ```bash
    python get_wx_gzh.py --chat-log input/messages.txt
    ```
-   如果需要 Markdown 和 PDF：
-   ```bash
-   python get_wx_gzh.py --chat-log input/messages.txt --markdown --pdf
-   ```
 
-### 3. 模式 B：从数据库解密
+### 3. 模式 B：从数据库提取 (Pipeline Workflow)
+这是一个两步走流程：先提取链接，再批量下载。
+
+**步骤 1: 提取链接**
+使用专用工具 `wechat_db_tool.py` 从微信数据库提取 URL。
 ```bash
-python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
+# 解密并提取 (需要 sqlcipher)
+python wechat_db_tool.py --db-path input/Favorite.db --key "YOUR_KEY" -o input/db_urls.txt
+```
+
+**步骤 2: 批量下载**
+将提取到的 URL 列表传给下载器。
+```bash
+python get_wx_gzh.py input/db_urls.txt --markdown --pdf
 ```
 
 ### 4. 模式 C：智能参数与交互模式 (New)
@@ -64,7 +68,6 @@ python get_wx_gzh.py --db --key "YOUR_64_CHAR_KEY" --markdown --pdf
 直接运行程序，粘贴包含 `&` 等特殊字符的 URL（无需加引号）：
 ```bash
 python get_wx_gzh.py
-# 程序提示: 请输入文章 URL (回车确认): <在此粘贴>
 ```
 
 #### 智能文件读取
@@ -81,39 +84,22 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 
 ## ⚙️ 基础配置 (Basic Config)
 
-从 v4.6 开始，支持使用项目根目录下的 `.env` 文件进行快速参数配置（推荐）。
-
-1. 复制 `.env.sample` (如果存在) 或直接新建 `.env` 文件。
-2. 常用配置项：
-   ```ini
-   # 全局并发控制 (默认 3)
-   CONCURRENCY=3
-   
-   # 索引页每页显示文章数 (默认 20)
-   PAGE_SIZE=20
-   
-   # 日志级别 (INFO/DEBUG/ERROR)
-   LOG_LEVEL=INFO
-   ```
-
-## ⚙️ 高级配置 (Advanced Config)
-
-为了应对微信的反爬虫机制或下载特定权限的文章，您可以创建 `config.json` 来配置自定义 Header。
-
-1. 将 `config.sample.json` 重命名为 `config.json`。
-2. 在浏览器中获取您的 `Cookie` 和 `User-Agent`。
-3. 填入 `config.json` 相应字段。
-
-该文件已被 `.gitignore` 忽略，您的隐私数据不会被提交到仓库。
+支持使用项目根目录下的 `.env` 文件进行快速参数配置（推荐）。
+常用配置项：
+```ini
+CONCURRENCY=3
+PAGE_SIZE=20
+LOG_LEVEL=INFO
+```
 
 ## ⚙️ 命令行参数
 
 | 参数 | 说明 | 默认值 |
 | :--- | :--- | :--- |
-| `-i, --input` | 输入 URL 文件路径 | `input/urls.txt` |
+| `url` | 智能参数 (URL 或 文件路径) | - |
+| `-i, --input` | (传统) 输入 URL 文件路径 | `input/urls.txt` |
 | `--concurrency` | 全局并发处理文章数 | `3` |
 | `--chat-log` | 指定聊天记录导出文件 (txt) | - |
-| `--db` | 启用数据库读取模式 | - |
 | `--markdown` | 启用 Markdown 生成 | `False` |
 | `--pdf` | 启用 PDF 生成 | `False` |
 | `--no-images` | 禁用图片下载 | `False` |
@@ -122,45 +108,29 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 
 ## 🛠️ 辅助工具 (Helper Tools)
 
-项目包含一些独立的辅助脚本，用于维护已下载的数据。
+### 数据库提取工具 (`wechat_db_tool.py`)
+用于从加密的 `Favorite.db` 中导出文章链接。详见模式 B。
 
 ### 索引重建工具 (`regenerate_index.py`)
-当您手动整理了 `output/` 目录，或修改了 `PAGE_SIZE` 配置后，无需重新下载即可刷新全局索引。
-
+手动刷新全局 SPA 索引页面。
 ```bash
-# 使用默认配置重建
 python regenerate_index.py
-
-# 临时指定每页 50 条记录
-python regenerate_index.py --page-size 50
 ```
 
 ## 🗺️ 项目路线图 (Roadmap)
 
-*   [x] **v1.x/2.x**: Markdown 转换、图片本地化、PDF 导出。
-*   [x] **v3.0/3.1**: 数据库读取、聊天记录正则提取。
-*   [x] **v3.3**: 增加 `history.log` 实现断点续传和自动重试。
-*   [x] **v3.4**: 渲染逻辑重构，优化正文提取与扁平目录结构。
-*   [x] **v4.0**: 默认 HTML 输出、可选 Markdown/PDF、文件名智能截断、PDF 容错排版。
-*   [x] **v4.1**: 元数据生成、全局 HTML 索引、正文内容智能清洗。
-*   [x] **v4.2**: 外部配置化支持 (Cookie/User-Agent)，增强反爬应对能力。
-*   [x] **v4.3**: 图片频道精准解析逻辑（括号平衡算法）。
-*   [x] **v4.4**: 架构重构（策略模式解析器）。
-*   [x] **v4.5 (Current)**: 异步架构升级，支持全局并发控制 (`--concurrency`) 与图片并行下载。
-*   [ ] **v4.7 (Planned)**: 资产清单管理 (CSV RecordManager)，替代 history.log 实现结构化记录。
-*   [ ] **v4.8 (Planned)**: 自动捕获失败样本机制 (Failed Sample Auto-capture)，构建全面的测试固件库。
-*   [ ] **v5.0 (Planned)**: 多媒体深度支持（视频/语音下载）。
+*   [x] **v4.5**: 异步架构升级，支持全局并发控制与图片并行下载。
+*   [x] **v4.8**: 交互式体验升级与 SPA 索引重构。
+*   [x] **v4.9**: 安全加固（XSS/SQLi/SSRF）与异步持久化。
+*   [x] **v5.0 (Current)**: 数据库功能解耦，引入 `wechat_db_tool.py` 专用提取工具。
+*   [ ] **v5.x (Planned)**: 多媒体深度支持（视频/语音下载）。
 
 ## 🧪 测试 (Testing)
-
-项目配备了完善的自动化测试套件，涵盖了解析器逻辑与核心应用流程。建议在重大改动后运行测试：
 
 ```bash
 # 运行全部自动化测试
 python3 -m unittest discover tests
 ```
-
-关于测试逻辑的详细说明，请参考 [Refactoring Report v4.6.0](docs/refactoring_v4.6.md#3-测试策略)。
 
 ## 📝 许可证
 MIT License

@@ -1,4 +1,14 @@
-## [v4.9.0] - 2026-02-08
+## [v5.0.0] - 2026-02-09
+
+### 💥 重大变更 (Breaking Changes)
+- **数据库功能解耦**: 主程序 `get_wx_gzh.py` 不再支持直接读取或解密数据库。移除了 `--db`, `--key`, `--db-path`, `--decrypted-db` 等所有相关参数。
+- **职责纯化**: `get_wx_gzh.py` 现在是一个纯粹的下载器，仅接受 URL 字符串或文件列表作为输入。
+
+### ✨ 新增工具 (New Tools)
+- **`wechat_db_tool.py`**: 全新的独立工具，专用于处理微信数据库。
+    - **解密**: 支持调用 `sqlcipher` 解密 `Favorite.db`。
+    - **提取**: 解析数据库结构并导出文章链接至文本文件。
+    - **安全**: 将敏感的解密逻辑和 SQL 操作物理隔离，提升了主程序的安全性。
 
 ### 🛡️ 安全加固 (Security Hardening)
 - **XSS 彻底修复**: 在 `core/index_manager.py` 中增加了对嵌入式 JSON 数据的 HTML 实体转义（Unicode 编码），彻底杜绝了恶意文章标题通过 `</script>` 截断标签引发的 XSS 风险。
