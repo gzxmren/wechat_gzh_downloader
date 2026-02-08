@@ -204,7 +204,7 @@ output/
   - **文本模式** (`-i`): 从 `urls.txt` 读取
 - 支持多格式输出：HTML（默认）、Markdown（`--markdown`）、PDF（`--pdf`）
 - 异步并发下载（`--concurrency` 控制并发数）
-- 断点续传（基于 `history.log`）
+- 断点续传（基于 `wechat_records.csv`）
 - 智能重试机制
 
 **使用示例**:
@@ -584,17 +584,17 @@ pip install -r requirements.txt
 
 **文件类型**: 数据文件
 
-**说明**: 记录已成功处理的 URL，用于断点续传。
+**说明**: 旧版程序的断点续传记录。
 
-**状态**: v4.7 计划用 `wechat_records.csv` 替代。
+**状态**: 已被 `wechat_records.csv` 替代。程序启动时会自动将其迁移并重命名为 `.bak`。
 
 ---
 
-#### `wechat_records.csv` - 资产清单（计划中）
+#### `wechat_records.csv` - 资产清单 (Current)
 
 **文件类型**: 数据文件（CSV 格式）
 
-**说明**: 结构化的文章资产清单，替代 `history.log`。
+**说明**: 结构化的文章资产清单，也是断点续传的**唯一数据源**。
 
 **字段**:
 - URL

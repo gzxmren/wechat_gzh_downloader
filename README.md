@@ -16,7 +16,7 @@
 *   **内容清洗**: 自动移除广告、二维码和无关工具栏，生成纯净的阅读体验。
 *   **智能解析**: 自动适配标准图文与特殊图片频道 (`image_detail`)，解决部分文章无正文的问题。
 *   **数据资产化**: 为每篇文章生成 JSON 元数据，并自动维护一个全局可视化的 `index.html` 索引。
-*   **断点续传**: 自动记录处理成功的 URL (`history.log`)，支持中断后继续运行。
+*   **断点续传**: 自动记录处理成功的 URL (`wechat_records.csv`)，支持中断后继续运行。
 *   **异步并发 (New)**: 基于 `asyncio` 的异步架构，支持多任务并行抓取和图片并行下载，显著提升处理效率。
 *   **智能重试**: 内置失败重试机制，并记录错误日志 (`error.log`)。
 *   **交互式体验 (New)**:
@@ -116,7 +116,7 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
 | `--pdf` | 启用 PDF 生成 | `False` |
 | `--no-images` | 禁用图片下载 | `False` |
 | `--retry` | 失败重试次数 | `1` |
-| `--force` | 忽略 history.log，强制重新处理 | `False` |
+| `--force` | 忽略 wechat_records.csv，强制重新处理 | `False` |
 
 ## 🛠️ 辅助工具 (Helper Tools)
 
