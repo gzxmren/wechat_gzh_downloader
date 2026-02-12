@@ -5,6 +5,27 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from .config import settings
 from .logger import logger
 
+def validate_wx_url(url: str) -> bool:
+    """
+    严格校验 URL 格式，过滤掉拼写错误（如 hhttps, htpp）和非微信域名的链接。
+    """
+    if not url:
+        return False
+        
+    # 1. 基础协议检查 (防止 hhttps:// 等拼写错误)
+    if not url.startswith(("http://", "https://")):
+        return False
+        
+    try:
+        parsed = urlparse(url)
+        # 2. 域名检查 (必须是微信公众号相关域名)
+        if "mp.weixin.qq.com" not in parsed.netloc:
+            return False
+            
+        return True
+    except Exception:
+        return False
+
 def clean_url(url):
     """
     清理微信 URL 中可能触发风控或无用的参数。

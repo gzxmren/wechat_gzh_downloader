@@ -8,7 +8,7 @@ from typing import List, Set, Optional
 
 from .config import settings
 from .logger import logger
-from .downloader import download_html, clean_url
+from .downloader import download_html, clean_url, validate_wx_url
 from .parsers import find_and_parse
 from .converter import html_to_markdown
 from .file_manager import prepare_article_dir, save_markdown, save_metadata, sanitize_filename
@@ -44,6 +44,74 @@ class WeChatDownloaderApp:
                 return False
         
         return True
+
+    def _collect_target_urls(self) -> List[str]:
+        """
+        从多种来源（命令行、文件、聊天记录、交互输入）收集并校验目标 URL。
+        返回已通过 validate_wx_url 校验的 URL 列表。
+        """
+        urls = []
+        
+        # 1. 处理 --url 参数 (可能是链接也可能是文件)
+        if self.args.url:
+            if os.path.isfile(self.args.url):
+                logger.info(f"模式: 文件导入 -> {self.args.url}")
+                urls.extend(self._read_urls_from_file(self.args.url))
+            else:
+                if validate_wx_url(self.args.url):
+                    logger.info(f"模式: 单 URL 处理 -> {self.args.url}")
+                    urls.append(self.args.url)
+                else:
+                    logger.error(f"提供的 URL 无效: {self.args.url} (格式错误或非微信域名)")
+            
+            # 如果指定了 --url 且已获取到任务（或报错），则不再继续读取默认 input
+            if urls or not os.path.isfile(self.args.url):
+                return urls
+
+        # 2. 处理 --chat-log 参数
+        if self.args.chat_log:
+            raw_urls = self.extract_urls_from_log(self.args.chat_log)
+            valid_urls = [u for u in raw_urls if validate_wx_url(u)]
+            urls.extend(valid_urls)
+            return urls
+
+        # 3. 处理默认输入文件 (-i / input/urls.txt)
+        if os.path.exists(self.args.input):
+            urls.extend(self._read_urls_from_file(self.args.input))
+
+        # 4. 交互模式：如果上述来源均未提供任务，则提示用户手动输入
+        if not urls:
+            print("\n" + "="*50)
+            print("提示: 未检测到输入任务。")
+            print("Tip: 若 URL 包含 '&' 等特殊字符，请在此处直接粘贴 (无需引号)。")
+            print("="*50)
+            try:
+                raw_input = input("请输入文章 URL (回车确认): ").strip()
+                if raw_input:
+                    if validate_wx_url(raw_input):
+                        urls.append(raw_input)
+                    else:
+                        logger.error(f"输入的 URL 无效: {raw_input} (格式错误或非微信域名)")
+            except (EOFError, KeyboardInterrupt):
+                pass
+                
+        return urls
+
+    def _read_urls_from_file(self, file_path: str) -> List[str]:
+        """从文件中读取并过滤 URL"""
+        valid_urls = []
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("#"):
+                        if validate_wx_url(stripped):
+                            valid_urls.append(stripped)
+                        else:
+                            logger.warning(f"跳过无效 URL: {stripped} (格式错误或非微信域名)")
+        except Exception as e:
+            logger.error(f"读取文件失败 {file_path}: {e}")
+        return valid_urls
 
     def extract_urls_from_log(self, log_path: str) -> List[str]:
         """从聊天记录文本中提取微信文章链接"""
@@ -207,44 +275,7 @@ class WeChatDownloaderApp:
         self.processed_urls = self.record_manager.processed_urls
         
         # 2. 收集目标 URLs
-        all_target_urls = []
-        if self.args.url:
-            if os.path.isfile(self.args.url):
-                logger.info(f"模式: 文件导入 -> {self.args.url}")
-                try:
-                    with open(self.args.url, "r", encoding="utf-8") as f:
-                        for line in f:
-                            stripped = line.strip()
-                            if stripped and not stripped.startswith("#"):
-                                all_target_urls.append(stripped)
-                except Exception as e:
-                    logger.error(f"读取文件失败: {e}")
-            else:
-                all_target_urls = [self.args.url]
-                logger.info(f"模式: 单 URL 处理 -> {self.args.url}")
-        elif self.args.chat_log:
-            all_target_urls = self.extract_urls_from_log(self.args.chat_log)
-        else:
-            if os.path.exists(self.args.input):
-                with open(self.args.input, "r", encoding="utf-8") as f:
-                    for line in f:
-                        stripped = line.strip()
-                        if stripped and not stripped.startswith("#"):
-                            all_target_urls.append(stripped)
-            
-            # 交互模式：如果未通过参数或文件提供任何 URL，则提示用户输入
-            if not all_target_urls:
-                print("\n" + "="*50)
-                print("提示: 未检测到输入任务。")
-                print("Tip: 若 URL 包含 '&' 等特殊字符，请在此处直接粘贴 (无需引号)。")
-                print("="*50)
-                try:
-                    # 使用 input 阻塞式获取输入，此时尚未开始异步任务
-                    raw_input = input("请输入文章 URL (回车确认): ").strip()
-                    if raw_input:
-                        all_target_urls.append(raw_input)
-                except (EOFError, KeyboardInterrupt):
-                    pass
+        all_target_urls = self._collect_target_urls()
 
         # 3. 过滤 URL (先去重并保持顺序)
         unique_all_urls = list(dict.fromkeys(all_target_urls))
