@@ -1,3 +1,12 @@
+## [v5.1.0] - 2026-02-12
+
+### 🛡️ 安全与校验 (Security & Validation)
+- **严格 URL 校验**: 引入了 `validate_wx_url` 机制，在下载流程的最前端严格拦截非 HTTP/HTTPS 协议及非 `mp.weixin.qq.com` 域名的链接。有效防止了因拼写错误（如 `hhttps://`）或误贴其他网站链接导致的程序异常和资源浪费。
+
+### 🏗️ 代码重构 (Refactoring)
+- **URL 收集逻辑收敛**: 将分散在 `run` 方法各处（CLI参数、文件读取、交互输入、聊天记录）的 URL 收集与过滤逻辑，统一封装至 `WeChatDownloaderApp._collect_target_urls` 私有方法中。
+- **单一职责**: 主控制流更加清晰，所有输入源的数据清洗标准完全统一，大幅提升了代码的可维护性。
+
 ## [v5.0.0] - 2026-02-09
 
 ### 💥 重大变更 (Breaking Changes)

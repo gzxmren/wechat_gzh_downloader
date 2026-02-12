@@ -53,6 +53,9 @@ graph TD
     - **ImageDetailParser (混合解析)**: 针对图片频道。不仅提取 `picture_page_info_list` 里的高清图，还会智能检测并提取 `js_content` 里的传统正文。
     - **StandardParser**: 作为万能回退方案，提取标准的 HTML 正文。
 
+### 2.5 输入校验 (`core.downloader.validate_wx_url`)
+- **严格过滤**: 在任务分发前，强制校验所有来源的 URL。仅允许 `http/https` 协议且域名包含 `mp.weixin.qq.com` 的链接进入下载队列，有效屏蔽拼写错误（如 `hhttps://`）。
+
 ## 3. 关键流程
 
 ### 3.1 环境预检

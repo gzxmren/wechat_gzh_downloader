@@ -34,8 +34,8 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
 
         # 创建 Mock URL 文件
         with open(self.mock_args.input, "w") as f:
-            f.write("http://example.com/article1\n")
-            f.write("http://example.com/article2\n")
+            f.write("https://mp.weixin.qq.com/s/article1\n")
+            f.write("https://mp.weixin.qq.com/s/article2\n")
 
     def tearDown(self):
         # 清理
@@ -68,7 +68,7 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
             "author": "Test Author",
             "publish_date": "2023-01-01",
             "content_html": "<div>Content</div>",
-            "original_url": "http://example.com/article1"
+            "original_url": "https://mp.weixin.qq.com/s/article1"
         }
         
         # 3. 模拟 html_to_markdown 返回
@@ -93,7 +93,7 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         # 验证内容写入是否成功 (Async Write Check)
         with open(csv_path, "r", encoding="utf-8-sig") as f:
             content = f.read()
-            self.assertIn("http://example.com/article1", content)
+            self.assertIn("https://mp.weixin.qq.com/s/article1", content)
             self.assertIn("success", content)
 
     @patch("core.app.download_html", new_callable=AsyncMock)
@@ -107,12 +107,12 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
             "author": "Test Author",
             "publish_date": "2023-01-02",
             "content_html": "<div>Content</div>",
-            "original_url": "http://example.com/article2"
+            "original_url": "https://mp.weixin.qq.com/s/article2"
         }
 
         # 先写入一条旧版历史记录
         with open("history.log", "w") as f:
-            f.write("http://example.com/article1\n")
+            f.write("https://mp.weixin.qq.com/s/article1\n")
             
         # 初始化 App
         app = WeChatDownloaderApp(self.mock_args)
