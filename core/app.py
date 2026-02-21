@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import random
 import re
+import sys 
 from typing import List, Set, Optional
 
 from .config import settings
@@ -47,10 +48,26 @@ class WeChatDownloaderApp:
 
     def _collect_target_urls(self) -> List[str]:
         """
-        从多种来源（命令行、文件、聊天记录、交互输入）收集并校验目标 URL。
+        从多种来源（命令行、文件、聊天记录、管道）收集并校验目标 URL。
         返回已通过 validate_wx_url 校验的 URL 列表。
         """
         urls = []
+
+        # NEW: Check for piped input first
+        # If sys.stdin is not an interactive terminal (i.e., piped input)
+        if not sys.stdin.isatty():
+            logger.info("模式: 从管道 (pipe) 读取 URL")
+            for line in sys.stdin:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"): # Ignore empty lines and comments
+                    if validate_wx_url(stripped):
+                        urls.append(stripped)
+                    else:
+                        logger.warning(f"跳过无效 URL (来自管道): {stripped} (格式错误或非微信域名)")
+            if urls: # If we got URLs from stdin, prioritize them and return
+                return urls
+            else: # If piped input was empty or invalid, still proceed to other sources
+                logger.info("管道中未检测到有效 URL，将检查其他输入源。")
         
         # 1. 处理 --url 参数 (可能是链接也可能是文件)
         if self.args.url:
@@ -64,7 +81,6 @@ class WeChatDownloaderApp:
                 else:
                     logger.error(f"提供的 URL 无效: {self.args.url} (格式错误或非微信域名)")
             
-            # 如果指定了 --url 且已获取到任务（或报错），则不再继续读取默认 input
             if urls or not os.path.isfile(self.args.url):
                 return urls
 
@@ -78,22 +94,6 @@ class WeChatDownloaderApp:
         # 3. 处理默认输入文件 (-i / input/urls.txt)
         if os.path.exists(self.args.input):
             urls.extend(self._read_urls_from_file(self.args.input))
-
-        # 4. 交互模式：如果上述来源均未提供任务，则提示用户手动输入
-        if not urls:
-            print("\n" + "="*50)
-            print("提示: 未检测到输入任务。")
-            print("Tip: 若 URL 包含 '&' 等特殊字符，请在此处直接粘贴 (无需引号)。")
-            print("="*50)
-            try:
-                raw_input = input("请输入文章 URL (回车确认): ").strip()
-                if raw_input:
-                    if validate_wx_url(raw_input):
-                        urls.append(raw_input)
-                    else:
-                        logger.error(f"输入的 URL 无效: {raw_input} (格式错误或非微信域名)")
-            except (EOFError, KeyboardInterrupt):
-                pass
                 
         return urls
 
@@ -153,21 +153,17 @@ class WeChatDownloaderApp:
                     # 1. 下载 (内部已有随机延迟)
                     html_content = await download_html(url, session=session)
                     if not html_content:
-                        # 如果下载函数返回 None，通常意味着触发了验证码或网络错误
                         raise ValueError("Download failed (Anti-bot or Network)")
                     
                     # 2. 解析 (支持多解析器)
                     article_data = find_and_parse(html_content, url)
                     if not article_data:
                         await self.triage_manager.capture(url, html_content, "NO_PARSER_MATCHED")
-                        logger.error(f"解析失败 (所有解析器均无法处理): {url}")
-                        # 解析失败通常是内容问题，重试可能无用，但保持一致性还是抛出异常
                         raise ValueError("Parsing failed (No parser matched)")
 
                     title = article_data.get('title')
                     if not title:
                         await self.triage_manager.capture(url, html_content, "EMPTY_TITLE")
-                        logger.error(f"解析失败 (标题为空): {url}")
                         raise ValueError("Parsing failed (Empty title)")
 
                     author = article_data['author']
@@ -191,9 +187,7 @@ class WeChatDownloaderApp:
                     
                     # --- Metadata 保存 ---
                     metadata = {
-                        "title": title,
-                        "author": author,
-                        "publish_date": publish_date,
+                        "title": title, "author": author, "publish_date": publish_date,
                         "original_url": article_data['original_url'],
                         "download_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     }
@@ -220,12 +214,8 @@ class WeChatDownloaderApp:
                     
                     # 写入 CSV 成功记录
                     await self.record_manager.add_record(
-                        url=url,
-                        status='success',
-                        title=title,
-                        author=author,
-                        published_date=publish_date,
-                        folder_name=os.path.basename(article_dir),
+                        url=url, status='success', title=title, author=author,
+                        published_date=publish_date, folder_name=os.path.basename(article_dir),
                         source='downloader'
                     )
 
@@ -246,14 +236,12 @@ class WeChatDownloaderApp:
                         current_html = locals().get('html_content')
                         if current_html and "Parsing failed" in error_msg:
                              await self.triage_manager.capture(
-                                url, current_html, "EXCEPTION_RETRY_EXHAUSTED", 
-                                exception=e
+                                url, current_html, "EXCEPTION_RETRY_EXHAUSTED", exception=e
                             )
 
                         # 写入 CSV 失败记录
                         await self.record_manager.add_record(
-                            url=url,
-                            status='failed',
+                            url=url, status='failed',
                             failure_reason=f"Failed after {max_attempts} attempts: {error_msg}",
                             source='downloader'
                         )
@@ -264,14 +252,51 @@ class WeChatDownloaderApp:
                         logger.warning(f"处理出错 {url} (尝试 {attempt}/{max_attempts}): {e} - {backoff}秒后重试...")
                         await asyncio.sleep(backoff)
 
-    async def run(self):
-        logger.info(f"--- 微信公众号文章下载器 v{settings.VERSION} (Async) ---")
+    async def run_interactive_mode(self):
+        """运行持续交互模式，循环处理用户输入的URL。"""
+        logger.info("--- 进入交互模式 (输入 'quit' 退出) ---")
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
         
-        # 0. 环境预检
-        if not self.pre_run_check():
-            return
+        async with aiohttp.ClientSession() as session:
+            while True:
+                try:
+                    raw_input_str = input("\n请输入文章 URL: ").strip()
+                    if not raw_input_str:
+                        continue
+                    if raw_input_str.lower() == 'quit':
+                        logger.info("--- 退出交互模式 ---")
+                        break
 
-        # 1. 获取已处理 URL (RecordManager 在初始化时已自动迁移)
+                    if not validate_wx_url(raw_input_str):
+                        logger.error(f"输入的 URL 无效: {raw_input_str} (格式错误或非微信域名)")
+                        continue
+                    
+                    self.processed_urls = self.record_manager.processed_urls
+                    cleaned_url = clean_url(raw_input_str)
+                    if not self.args.force and cleaned_url in self.processed_urls:
+                        logger.warning(f"[Skipped] URL 已被处理过: {cleaned_url}")
+                        continue
+
+                    semaphore = asyncio.Semaphore(1)
+                    result = await self.process_single_url(raw_input_str, today_str, session, semaphore)
+
+                    if result and result.get("success"):
+                        logger.info(f"处理成功。您可以继续输入下一个 URL。")
+                    else:
+                        logger.error(f"处理失败。您可以继续输入下一个 URL 或 'quit' 退出。")
+
+                except (EOFError, KeyboardInterrupt):
+                    logger.info("\n--- 退出交互模式 ---")
+                    break
+        
+        # 交互模式结束后，生成一次索引
+        logger.info("正在更新全局索引...")
+        generate_global_index(self.args.output)
+
+
+    async def run_batch_mode(self):
+        """运行批量处理模式，处理来自文件或参数的URL。"""
+        # 1. 获取已处理 URL
         self.processed_urls = self.record_manager.processed_urls
         
         # 2. 收集目标 URLs
@@ -281,6 +306,17 @@ class WeChatDownloaderApp:
         unique_all_urls = list(dict.fromkeys(all_target_urls))
         target_urls = unique_all_urls if self.args.force else [u for u in unique_all_urls if u not in self.processed_urls]
         
+        # 如果没有任何来源的URL，则提示并退出
+        if not all_target_urls:
+            if not self.args.url and not self.args.chat_log and not os.path.exists(self.args.input):
+                 logger.info("没有提供任何输入源 (URL参数、输入文件或聊天记录)。")
+                 logger.info("提示: 如需处理单个链接，请使用 'python get_wx_gzh.py \"<URL>\"'。")
+                 logger.info("提示: 如需进入交互模式，请使用 'python get_wx_gzh.py --interactive'。")
+            else:
+                 logger.info("在指定输入源中未找到有效链接。")
+            return
+        
+        # 如果有来源但所有URL都已被处理
         if not target_urls:
             logger.info("没有新任务需要处理。")
             generate_global_index(self.args.output)
@@ -293,22 +329,12 @@ class WeChatDownloaderApp:
         semaphore = asyncio.Semaphore(concurrency)
         
         async with aiohttp.ClientSession() as session:
-            tasks = []
-            for url in target_urls:
-                # 加入微小的 staggered start 延迟
-                await asyncio.sleep(random.uniform(0.5, 1.5))
-                tasks.append(self.process_single_url(url, today_str, session, semaphore))
-            
+            tasks = [self.process_single_url(url, today_str, session, semaphore) for url in target_urls]
             results = await asyncio.gather(*tasks)
 
         # 统计与扫尾
-        success_count = 0
-        failed_count = 0
-        for res in results:
-            if res["success"]:
-                success_count += 1
-            else:
-                failed_count += 1
+        success_count = sum(1 for res in results if res["success"])
+        failed_count = len(results) - success_count
 
         logger.info(f"\n--- 处理摘要 ---")
         logger.info(f"任务总数: {len(target_urls)}")
@@ -317,3 +343,15 @@ class WeChatDownloaderApp:
         
         logger.info("正在更新全局索引...")
         generate_global_index(self.args.output)
+
+    async def run(self):
+        """根据参数决定运行模式：交互式或批量处理。"""
+        logger.info(f"--- 微信公众号文章下载器 v{settings.VERSION} (Async) ---")
+        
+        if not self.pre_run_check():
+            return
+
+        if self.args.interactive:
+            await self.run_interactive_mode()
+        else:
+            await self.run_batch_mode()

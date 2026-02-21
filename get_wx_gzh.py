@@ -25,6 +25,7 @@ def parse_args():
     parser.add_argument("--concurrency", type=int, default=None, help="全局并发处理文章数 (默认: 3)")
     
     # 模式选择
+    parser.add_argument("--interactive", action="store_true", help="进入连续交互模式")
     parser.add_argument("--chat-log", help="指定导出的聊天记录文件 (txt格式)")
     
     # 功能开关
