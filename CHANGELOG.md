@@ -1,3 +1,15 @@
+## [v5.2.0] - 2026-02-22
+
+### ✨ 功能增强 (Features)
+- **持续交互模式**: 新增 `--interactive` 命令行参数。启动后程序将进入循环会话，允许用户连续输入并处理多个 URL，直到输入 `quit` 退出。极大提升了处理多个不相关链接时的易用性。
+- **管道输入支持 (Pipe Support)**: 程序现在完全兼容 Unix/Linux 管道操作。可以从标准输入（stdin）直接读取 URL 列表，从而实现与 `cat`, `grep` 等命令的无缝集成，增强了脚本自动化能力 (例如 `cat urls.txt | python get_wx_gzh.py`)。
+
+### 🏗️ 代码重构 (Refactoring)
+- **输入逻辑重构**: 对 `WeChatDownloaderApp` 的 URL 收集逻辑进行了重构，明确分离出批量模式 (`run_batch_mode`) 和交互模式 (`run_interactive_mode`)，使代码结构更清晰。
+- **移除旧交互模式**: 彻底移除了当无参数运行时自动进入单次交互的隐式行为，使得程序的启动模式更加明确可控。
+
+---
+
 ## [v5.1.0] - 2026-02-12
 
 ### 🛡️ 安全与校验 (Security & Validation)

@@ -20,11 +20,9 @@
 *   **异步并发 (New)**: 基于 `asyncio` 的异步架构，支持多任务并行抓取和图片并行下载，显著提升处理效率。
 *   **异步重试 (New)**: 完善的重试机制与线性退避策略，大幅提升弱网环境下的任务成功率。
 *   **环境预检 (New)**: 启动时自动检测 `wkhtmltopdf` 等核心依赖，提供友好的错误提示。
-*   **交互式体验 (New)**:
-    *   **智能参数**: 自动识别文件路径或 URL，无需 `-i` 参数。
-    *   **交互模式**: 直接运行程序可进入交互模式，支持粘贴复杂 URL（无需引号），解决命令行特殊字符转义痛点。
-    *   **SPA 索引**: 重构后的 `index.html` 采用单页应用架构，支持即时搜索、排序和客户端分页。
-
+    *   **交互式体验 (v5.2 New)**:
+        *   **持续交互模式**: 使用 `--interactive` 进入循环会话，可持续处理 URL。
+        *   **管道模式**: 支持从标准输入读取 URL (例如 `cat urls.txt | python get_wx_gzh.py`)，便于脚本集成。
 ## 🚀 快速开始
 
 ### 1. 环境准备
@@ -62,24 +60,28 @@ python wechat_db_tool.py --db-path input/Favorite.db --key "YOUR_KEY" -o input/d
 python get_wx_gzh.py input/db_urls.txt --markdown --pdf
 ```
 
-### 4. 模式 C：智能参数与交互模式 (New)
+### 4. 模式 C：交互式与管道模式 (v5.2 New)
 
-#### 交互模式 (解决 URL 引号问题)
-直接运行程序，粘贴包含 `&` 等特殊字符的 URL（无需加引号）：
+#### 持续交互模式 (推荐)
+启动一个循环会话，可以连续输入 URL 进行处理，输入 `quit` 退出。
 ```bash
-python get_wx_gzh.py
+python get_wx_gzh.py --interactive
 ```
 
-#### 智能文件读取
-直接传入文件路径，自动识别为批量模式：
+#### 管道模式 (推荐用于脚本)
+支持从其他命令通过管道传递 URL 列表。
 ```bash
-python get_wx_gzh.py input/urls.txt
+cat my_urls.txt | python get_wx_gzh.py
 ```
 
-#### 智能单篇下载
-直接传入 URL，自动识别为单篇模式：
+#### 智能参数模式
+直接传入 URL 或文件名进行处理。
 ```bash
+# 下载单篇文章
 python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
+
+# 从文件批量下载
+python get_wx_gzh.py input/urls.txt
 ```
 
 ## ⚙️ 基础配置 (Basic Config)

@@ -26,23 +26,21 @@
 #### 🚀 基本运行方式
 
 ```bash
-# 1. 交互式模式 (New) - 推荐用于复杂 URL
-# 直接运行，程序会提示粘贴 URL（无需加引号）
-python get_wx_gzh.py
+# 1. 持续交互模式 (v5.2 New) - 推荐
+# 启动一个循环会话，可以连续输入 URL 进行处理
+python get_wx_gzh.py --interactive
 
-# 2. 智能文件读取 (New)
-# 直接传入文件路径，自动识别为批量模式
-python get_wx_gzh.py input/urls.txt
+# 2. 管道模式 (v5.2 New) - 推荐用于脚本和自动化
+# 支持从其他命令通过管道传递 URL 列表
+cat my_urls.txt | python get_wx_gzh.py
+echo "https://mp.weixin.qq.com/s/xxxxx" | python get_wx_gzh.py
 
-# 3. 智能单篇下载 (New)
-# 直接传入 URL，自动识别为单篇模式
-python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
-
-# 4. 从聊天记录导出文件下载（推荐）
+# 3. 从聊天记录导出文件下载
 python get_wx_gzh.py --chat-log input/messages.txt
 
-# 5. (传统方式) 显式指定输入文件
-python get_wx_gzh.py -i input/urls.txt
+# 4. (传统方式) 智能参数，可直接传入 URL 或文件名
+python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx
+python get_wx_gzh.py input/urls.txt
 ```
 
 > **💡 智能过滤**: 所有的输入模式均经过严格校验。程序会自动跳过拼写错误（如 `hhttps://`）或非微信域名（非 `mp.weixin.qq.com`）的链接，并打印 Warning 日志。
@@ -70,6 +68,7 @@ python get_wx_gzh.py -i input/urls.txt
 
 | 参数 | 类型 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
+| `--interactive` | 开关 | `False` | (v5.2 New) 启动持续交互模式 | `--interactive` |
 | `--chat-log` | 文件路径 | - | 指定导出的聊天记录文件（txt 格式） | `--chat-log input/messages.txt` |
 
 ##### 输出格式参数
@@ -91,7 +90,37 @@ python get_wx_gzh.py -i input/urls.txt
 
 #### 💼 使用场景与示例
 
-##### 场景 1: 从聊天记录批量下载（最常用）
+##### 场景 1: 持续交互式下载 (v5.2 新增, 推荐)
+
+```bash
+# 1. 启动交互模式
+python get_wx_gzh.py --interactive
+
+# 2. 根据提示，逐个粘贴 URL 并回车
+#    程序会自动处理并等待下一个 URL
+#
+# 3. 输入 'quit' 退出
+```
+
+**目的**: 适合需要连续下载多个不相关 URL 的场景，无需频繁重启程序。
+
+---
+
+##### 场景 2: 使用管道批量下载 (v5.2 新增, 推荐)
+
+```bash
+# 从一个文件中读取 URL 列表并通过管道传递
+cat my_urls.txt | python get_wx_gzh.py --markdown
+
+# 从另一个命令的输出中提取并下载
+grep "https://mp.weixin.qq.com" full_log.txt | python get_wx_gzh.py
+```
+
+**目的**: 实现与其他命令行工具的联动，构建强大的自动化工作流。
+
+---
+
+##### 场景 3: 从聊天记录批量下载（最常用）
 
 ```bash
 # 1. 在 PC 微信收藏夹全选文章 -> 转发给"文件传输助手"
@@ -107,10 +136,10 @@ python get_wx_gzh.py --chat-log input/messages.txt --markdown --pdf
 
 ---
 
-##### 场景 2: 从 URL 列表下载
+##### 场景 4: 从 URL 列表下载
 
 ```bash
-# 从默认文件 input/urls.txt 下载
+# 从默认文件 input/urls.txt 下载 (如果存在)
 python get_wx_gzh.py
 
 # 从自定义文件下载
@@ -124,7 +153,7 @@ python get_wx_gzh.py input/urls.txt --concurrency 5
 
 ---
 
-##### 场景 3: 下载单篇文章
+##### 场景 5: 下载单篇文章
 
 ```bash
 # 直接指定 URL
@@ -135,7 +164,7 @@ python get_wx_gzh.py https://mp.weixin.qq.com/s/xxxxx --markdown --pdf
 
 ---
 
-##### 场景 4: 强制重新下载
+##### 场景 6: 强制重新下载
 
 ```bash
 # 忽略历史记录，强制重新处理所有 URL
