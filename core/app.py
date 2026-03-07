@@ -257,7 +257,7 @@ class WeChatDownloaderApp:
         logger.info("--- 进入交互模式 (输入 'quit' 退出) ---")
         today_str = datetime.date.today().strftime("%Y-%m-%d")
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             while True:
                 try:
                     raw_input_str = input("\n请输入文章 URL: ").strip()
@@ -328,7 +328,7 @@ class WeChatDownloaderApp:
         today_str = datetime.date.today().strftime("%Y-%m-%d")
         semaphore = asyncio.Semaphore(concurrency)
         
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             tasks = [self.process_single_url(url, today_str, session, semaphore) for url in target_urls]
             results = await asyncio.gather(*tasks)
 

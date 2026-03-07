@@ -27,8 +27,9 @@ class StandardParser(BaseParser):
         
         content_html = str(content_div) if content_div else None
         
-        # 如果连正文都找不到，且没有标题，可能是无效页面
-        if not content_html and title == "Untitled_Article":
+        # 如果找不到正文，即使有标题也认为解析失败（避免下游 BeautifulSoup(None) 报错）
+        # 这将触发 App 层的 triage 逻辑捕获该 HTML，方便后续分析新版页面结构
+        if not content_html:
             return None
 
         return {

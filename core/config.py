@@ -20,7 +20,7 @@ class Config:
     
     # App Settings
     APP_NAME = "WeChat Fav Downloader"
-    VERSION = "4.6.0"
+    VERSION = "4.6.1"
     
     # Index / Pagination
     PAGE_SIZE = int(os.getenv("PAGE_SIZE", 20))

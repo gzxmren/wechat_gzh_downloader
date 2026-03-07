@@ -299,33 +299,48 @@
         let currentKeyword = '';
         let currentSort = { field: 'date', order: 'desc' };
         let currentPage = 1;
-        const pageSize = {{ page_size if page_size else 20 }};
+        // Ensure pageSize is a valid number to prevent Infinite loops in pagination
+        const pageSize = parseInt("{{ page_size }}") || 20;
 
         window.addEventListener('DOMContentLoaded', function () {
+            console.log('DOM Content Loaded, starting to load records...');
             loadAllRecords();
             const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('input', () => {
-                if (window.searchTimeout) clearTimeout(window.searchTimeout);
-                window.searchTimeout = setTimeout(() => performSearch(), 250);
-            });
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') performSearch();
-            });
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    if (window.searchTimeout) clearTimeout(window.searchTimeout);
+                    window.searchTimeout = setTimeout(() => performSearch(), 250);
+                });
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') performSearch();
+                });
+            }
         });
 
         function loadAllRecords() {
+            const tbody = document.getElementById('table-body');
             try {
                 const dataContainer = document.getElementById('full-records-data');
                 const rawJsonData = dataContainer ? dataContainer.textContent : null;
-                if (!rawJsonData || rawJsonData.trim() === "" || rawJsonData.trim() === "None") return;
+                
+                if (!rawJsonData || rawJsonData.trim() === "" || rawJsonData.trim() === "None" || rawJsonData.trim() === "null") {
+                    console.warn('No record data found in script tag.');
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="3" class="no-results">没有找到任何归档记录</td></tr>';
+                    return;
+                }
 
                 allRecords = JSON.parse(rawJsonData);
+                console.log('Successfully loaded ' + allRecords.length + ' records.');
+                
                 filteredRecords = [...allRecords];
                 applySorting();
                 goToPage(1);
                 updateResultInfo();
             } catch (error) {
                 console.error('Data Load Error:', error);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="no-results" style="color: #e53935;">数据加载失败: ${escapeHtml(error.message)}<br><small style="color: #999;">请尝试重新生成索引或检查浏览器控制台</small></td></tr>`;
+                }
             }
         }
 

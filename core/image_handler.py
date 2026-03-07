@@ -61,7 +61,7 @@ async def download_image(url, save_dir, session=None):
         
         close_session = False
         if session is None:
-            session = aiohttp.ClientSession()
+            session = aiohttp.ClientSession(trust_env=True)
             close_session = True
             
         try:

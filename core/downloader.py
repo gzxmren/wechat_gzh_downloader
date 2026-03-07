@@ -74,13 +74,16 @@ async def download_html(url, session=None):
     
     close_session = False
     if session is None:
-        session = aiohttp.ClientSession()
+        session = aiohttp.ClientSession(trust_env=True)
         close_session = True
         
     try:
         async with session.get(url, headers=headers, timeout=req_settings.get("timeout", 15)) as response:
             if response.status != 200:
                 logger.error(f"HTTP {response.status} for {url}")
+                # Log if redirected to verification
+                if response.status in (301, 302) and "wappoc_appmsgcaptcha" in str(response.url):
+                    logger.error(f"Detection: Redirected to captcha page: {response.url}")
                 return None
             
             # aiohttp 默认会根据 Content-Type 自动猜测编码，
@@ -96,7 +99,8 @@ async def download_html(url, session=None):
             return html
 
     except Exception as e:
-        logger.error(f"Failed to fetch {url}: {e}")
+        error_detail = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
+        logger.error(f"Failed to fetch {url}: {error_detail}")
         return None
     finally:
         if close_session:

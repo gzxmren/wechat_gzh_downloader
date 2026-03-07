@@ -10,6 +10,9 @@ async def process_wechat_html(html_content, assets_dir=None, download_images=Fal
     2. 解决图片懒加载 (data-src -> src)
     3. (并行) 下载图片并替换为本地路径
     """
+    if not html_content:
+        return ""
+        
     soup = BeautifulSoup(html_content, "lxml")
     
     # --- 0. 内容清洗 (Content Cleaning) ---

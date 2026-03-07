@@ -17,3 +17,10 @@ debug_fail.html
 *.db-wal
 config.json
 debug_scripts/
+GEMINI.md
+batch_get_wechat_gzh.sh
+batch_get_wechat_gzh.sh.bak
+batch_get_wechat_gzh.sh.bak.1
+#docs/troubleshooting_dns_proxy_20260224.md
+logs/
+shell_pipeline.txt
