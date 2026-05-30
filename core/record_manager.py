@@ -41,6 +41,9 @@ class RecordManager:
         
         # 3. 加载已成功的 URL 集合用于去重
         self.load_existing_urls()
+        
+        # 4. 初始化协程写入锁，防止多协程并发写入冲突
+        self._lock = asyncio.Lock()
 
     def _init_csv(self):
         """初始化 CSV 文件"""
@@ -108,9 +111,10 @@ class RecordManager:
             writer.writerow(record)
             csv_line = buffer.getvalue()
             
-            # 异步写入文件
-            async with aiofiles.open(self.csv_path, 'a', encoding='utf-8-sig') as f:
-                await f.write(csv_line)
+            # 使用协程锁保护异步写入文件，规避并发写冲突
+            async with self._lock:
+                async with aiofiles.open(self.csv_path, 'a', encoding='utf-8-sig') as f:
+                    await f.write(csv_line)
                 
         except Exception as e:
             logger.error(f"追加 CSV 记录失败: {e}")

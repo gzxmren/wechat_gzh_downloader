@@ -3,6 +3,7 @@ import re
 import datetime
 import html as html_lib
 from bs4 import BeautifulSoup
+from typing import Optional
 
 class BaseParser(ABC):
     """
@@ -17,7 +18,7 @@ class BaseParser(ABC):
         pass
 
     @abstractmethod
-    def parse(self, html, url):
+    def parse(self, html, url, soup: Optional[BeautifulSoup] = None):
         """
         解析 HTML 内容。
         """
@@ -43,11 +44,13 @@ class BaseParser(ABC):
         # 2. 处理标准的 HTML 实体 (如 &lt; -> <)
         return html_lib.unescape(text)
 
-    def extract_common_metadata(self, html):
+    def extract_common_metadata(self, html, soup: Optional[BeautifulSoup] = None):
         """
         提取通用的元数据（标题、日期、作者）。
         """
-        soup = BeautifulSoup(html, "lxml")
+        from bs4 import BeautifulSoup
+        if soup is None:
+            soup = BeautifulSoup(html, "lxml")
         
         # 标题 (Title Fallback Logic)
         title = "Untitled_Article"

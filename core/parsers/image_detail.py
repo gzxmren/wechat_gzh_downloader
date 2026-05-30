@@ -12,9 +12,9 @@ class ImageDetailParser(BaseParser):
     def can_handle(self, html, url) -> bool:
         return 'picture_page_info_list' in html or 'album_info_list' in html
 
-    def parse(self, html, url):
+    def parse(self, html, url, soup=None):
         # 1. 提取通用元数据
-        title, author, publish_date = self.extract_common_metadata(html)
+        title, author, publish_date = self.extract_common_metadata(html, soup=soup)
 
         # 2. 全局预处理：移除所有空白字符
         clean_html = re.sub(r'\s+', '', html)
@@ -107,8 +107,9 @@ class ImageDetailParser(BaseParser):
             desc_text = self.decode_wechat_text(meta_desc_match.group(1)).replace('\n', '<br/>')
             
         # 10. 尝试提取常规 HTML 正文 (混合模式)
-        from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html, "lxml")
+        if soup is None:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "lxml")
         text_content_html = ""
         content_div = soup.find(id="js_content")
         if content_div:

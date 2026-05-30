@@ -15,12 +15,13 @@ class StandardParser(BaseParser):
         # 或者更严格一点：必须包含某些 ID
         return True
 
-    def parse(self, html, url):
+    def parse(self, html, url, soup=None):
         # 1. 提取通用元数据
-        title, author, publish_date = self.extract_common_metadata(html)
+        title, author, publish_date = self.extract_common_metadata(html, soup=soup)
 
         # 2. 正文提取
-        soup = BeautifulSoup(html, "lxml")
+        if soup is None:
+            soup = BeautifulSoup(html, "lxml")
         content_div = soup.find("div", class_="rich_media_content")
         if not content_div: content_div = soup.find(id="js_content")
         if not content_div: content_div = soup.find(id="img-content")

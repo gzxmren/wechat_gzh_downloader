@@ -1,4 +1,5 @@
 from typing import List, Type, Optional
+from bs4 import BeautifulSoup
 from .base import BaseParser
 
 _PARSER_REGISTRY: List[Type[BaseParser]] = []
@@ -14,11 +15,13 @@ def find_and_parse(html: str, url: str) -> Optional[dict]:
     """
     遍历注册表，尝试每一个适用的解析器，直到有一个成功解析并返回数据。
     """
+    # 优化：大体量 HTML 仅在入口构建一次 BeautifulSoup 树
+    soup = BeautifulSoup(html, "lxml")
     for parser_cls in _PARSER_REGISTRY:
         parser = parser_cls()
         if parser.can_handle(html, url):
             try:
-                data = parser.parse(html, url)
+                data = parser.parse(html, url, soup=soup)
                 if data:
                     return data
             except Exception as e:

@@ -38,11 +38,13 @@ class WeChatDownloaderApp:
         
     def pre_run_check(self) -> bool:
         """运行前的环境检查"""
-        # 1. 检查 PDF 依赖
+        # 1. 检查 PDF 依赖并弱降级
         if self.args.pdf:
             if not check_command_exists("wkhtmltopdf"):
-                logger.error("未找到 'wkhtmltopdf' 命令。请先安装它（如：sudo apt install wkhtmltopdf）或禁用 PDF 生成。")
-                return False
+                logger.warning("⚠️  未找到 'wkhtmltopdf' 命令，PDF 生成功能将不可用。")
+                logger.warning("   您可以前往 https://wkhtmltopdf.org/downloads.html 下载安装。")
+                logger.warning("   本次运行将自动跳过 PDF 生成，继续下载并归档 HTML 和 Markdown。")
+                self.args.pdf = False
         
         return True
 
@@ -149,6 +151,7 @@ class WeChatDownloaderApp:
             max_attempts = self.args.retry + 1
             
             for attempt in range(1, max_attempts + 1):
+                html_content = None
                 try:
                     # 1. 下载 (内部已有随机延迟)
                     html_content = await download_html(url, session=session)

@@ -2,6 +2,7 @@ import pdfkit
 import os
 import asyncio
 import re
+from .logger import logger
 
 # PDF 生成是进程密集型任务，限制并发数以保护 CPU
 PDF_SEMAPHORE = asyncio.Semaphore(2)
@@ -91,7 +92,11 @@ def _generate_pdf_sync(html_content, title, output_path, assets_dir):
                 pdfkit.from_string(full_html, output_path, options=base_options)
                 return True
             except Exception as e2:
-                print(f"[Error] PDF conversion fallback failed: {e2}")
+                logger.error(f"PDF 转换降级尝试失败: {e2}")
         else:
-            print(f"[Error] PDF conversion failed: {e}")
+            logger.error(f"PDF 生成失败: {e}")
+            if "wkhtmltopdf" in str(e).lower() or "executable" in str(e).lower():
+                logger.error("提示：请确认系统中已正确安装 wkhtmltopdf，并且已将其加入系统环境变量 PATH 中。")
+            else:
+                logger.error("提示：如果 PDF 中的中文显示为乱码或空白，请确认系统中已安装中文字体（如文泉驿等）。")
         return False

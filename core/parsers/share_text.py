@@ -13,9 +13,9 @@ class ShareTextParser(BaseParser):
         # 特征：引入了 common_share_text_content 脚本
         return 'common_share_text_content' in html
 
-    def parse(self, html, url):
+    def parse(self, html, url, soup=None):
         # 1. 提取标题 (优先使用 og:title)
-        title, author, publish_date = self.extract_common_metadata(html)
+        title, author, publish_date = self.extract_common_metadata(html, soup=soup)
         
         # 2. 提取更精准的作者 (JS 变量提取兜底)
         if author == "Unknown_Account":
