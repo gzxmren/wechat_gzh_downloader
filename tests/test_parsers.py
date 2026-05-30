@@ -93,7 +93,7 @@ class TestParsers(unittest.TestCase):
         # 2. 验证解析结果
         result = find_and_parse(html, url)
         self.assertIsNotNone(result)
-        self.assertEqual(result['type'], 'image_detail')
+        self.assertEqual(result['type'], 'image_text_mix')
         self.assertEqual(result['title'], "漫画：程序员的一天")
         
         # 3. 验证图片提取

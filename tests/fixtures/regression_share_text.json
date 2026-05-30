@@ -1,0 +1,10 @@
+{
+    "_comment": "这是 ShareTextParser 纯文字分享类型的回归测试用例",
+    "title": "开源AI热点Skill，同1条信息不用重看10遍了",
+    "author": "卡尔的AI沃茨",
+    "publish_date": "2026-05-26",
+    "url": "https://mp.weixin.qq.com/s/n9cZR5huBPV8WrWnBkKBjw",
+    "type": "share_text",
+    "expect_failure": false,
+    "reason": "WeChat short text post (Vite SPA layout)"
+}

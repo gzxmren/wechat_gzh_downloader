@@ -24,3 +24,12 @@ batch_get_wechat_gzh.sh.bak.1
 #docs/troubleshooting_dns_proxy_20260224.md
 logs/
 shell_pipeline.txt
+
+# Temporary local scan / tracking files
+processed_urls_in_logs.txt
+success_urls_in_csv.txt
+titles_in_folders.txt
+titles_in_index.txt
+
+# Antigravity CLI config/cache
+.antigravitycli/

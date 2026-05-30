@@ -22,6 +22,10 @@ def validate_wx_url(url: str) -> bool:
         if "mp.weixin.qq.com" not in parsed.netloc:
             return False
             
+        # 3. 路径检查 (排除验证码页面)
+        if "/mp/wappoc_appmsgcaptcha" in parsed.path:
+            return False
+            
         return True
     except Exception:
         return False

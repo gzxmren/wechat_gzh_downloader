@@ -63,7 +63,7 @@ class WeChatDownloaderApp:
                     if validate_wx_url(stripped):
                         urls.append(stripped)
                     else:
-                        logger.warning(f"跳过无效 URL (来自管道): {stripped} (格式错误或非微信域名)")
+                        logger.warning(f"  [INVALID] >>> ILLEGAL URL (from pipe): {stripped} (格式错误或非微信域名)")
             if urls: # If we got URLs from stdin, prioritize them and return
                 return urls
             else: # If piped input was empty or invalid, still proceed to other sources
@@ -230,7 +230,7 @@ class WeChatDownloaderApp:
                     if attempt == max_attempts:
                         result["error"] = error_msg
                         result["stage"] = "retry_exhausted" # 标记为重试耗尽
-                        logger.error(f"处理失败 {url} (尝试 {attempt}/{max_attempts}): {e}")
+                        logger.error(f"  [FAIL] !!! ERROR PROCESSING: {url} (重试 {max_attempts} 次后失败) !!! 原因: {error_msg}")
                         
                         # 尝试捕获现场 (如果是解析相关错误，html_content 可能存在)
                         current_html = locals().get('html_content')
@@ -249,7 +249,7 @@ class WeChatDownloaderApp:
                     else:
                         # 还有重试机会，等待后继续
                         backoff = attempt * 2 # 线性退避: 2s, 4s, 6s...
-                        logger.warning(f"处理出错 {url} (尝试 {attempt}/{max_attempts}): {e} - {backoff}秒后重试...")
+                        logger.warning(f"  [RETRY] >>> Processing error {url} (Attempt {attempt}/{max_attempts}): {e} - Retrying in {backoff}s...")
                         await asyncio.sleep(backoff)
 
     async def run_interactive_mode(self):
@@ -268,13 +268,13 @@ class WeChatDownloaderApp:
                         break
 
                     if not validate_wx_url(raw_input_str):
-                        logger.error(f"输入的 URL 无效: {raw_input_str} (格式错误或非微信域名)")
+                        logger.error(f"  [INVALID] >>> ILLEGAL URL: {raw_input_str} (格式错误或非微信域名)")
                         continue
                     
                     self.processed_urls = self.record_manager.processed_urls
                     cleaned_url = clean_url(raw_input_str)
                     if not self.args.force and cleaned_url in self.processed_urls:
-                        logger.warning(f"[Skipped] URL 已被处理过: {cleaned_url}")
+                        logger.warning(f"  [SKIP] >>> DUPLICATE URL: {cleaned_url} (已在记录中)")
                         continue
 
                     semaphore = asyncio.Semaphore(1)
@@ -304,7 +304,16 @@ class WeChatDownloaderApp:
 
         # 3. 过滤 URL (先去重并保持顺序)
         unique_all_urls = list(dict.fromkeys(all_target_urls))
-        target_urls = unique_all_urls if self.args.force else [u for u in unique_all_urls if u not in self.processed_urls]
+        
+        target_urls = []
+        skip_count = 0
+        for url in unique_all_urls:
+            cleaned_u = clean_url(url)
+            if self.args.force or cleaned_u not in self.processed_urls:
+                target_urls.append(url)
+            else:
+                logger.warning(f"  [SKIP] >>> DUPLICATE URL: {url} (已在记录中)")
+                skip_count += 1
         
         # 如果没有任何来源的URL，则提示并退出
         if not all_target_urls:
@@ -318,12 +327,12 @@ class WeChatDownloaderApp:
         
         # 如果有来源但所有URL都已被处理
         if not target_urls:
-            logger.info("没有新任务需要处理。")
+            logger.info(f"没有新任务需要处理。({skip_count} 个任务已跳过)")
             generate_global_index(self.args.output)
             return
 
         concurrency = self.args.concurrency or settings.CONCURRENCY
-        logger.info(f"待处理任务: {len(target_urls)} 个，并发数限制: {concurrency}")
+        logger.info(f"待处理任务: {len(target_urls)} 个 (已跳过 {skip_count} 个)，并发数限制: {concurrency}")
 
         today_str = datetime.date.today().strftime("%Y-%m-%d")
         semaphore = asyncio.Semaphore(concurrency)

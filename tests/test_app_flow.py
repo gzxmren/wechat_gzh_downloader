@@ -31,6 +31,7 @@ class TestAppFlow(unittest.IsolatedAsyncioTestCase):
         self.mock_args.no_images = True
         self.mock_args.chat_log = None
         self.mock_args.db = False
+        self.mock_args.interactive = False
 
         # 创建 Mock URL 文件
         with open(self.mock_args.input, "w") as f:
